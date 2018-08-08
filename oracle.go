@@ -10,11 +10,13 @@ import (
 
 type Block struct {
 	index      int
-	miner      int
+	minerID    int
 	parent     *Block
 	references []*Block
 	children   []*Block
-	seen       map[int]bool
+
+	seen     map[int]bool
+	residual float64
 }
 
 type BlockLedger []*Block
@@ -29,17 +31,14 @@ type MinerSet struct {
 }
 
 type Oracle struct {
-	queue  *EventQueue
-	miners *MinerSet
-	blocks BlockLedger
+	queue   *EventQueue
+	miners  *MinerSet
+	blocks  BlockLedger
+	network *NetworkManager
 
 	timestamp  int64
 	difficulty float64
 	random     *rand.Rand
-}
-
-type NetworkManager interface {
-	getDelay(int, int) int
 }
 
 func NewOracle() *Oracle {
@@ -67,36 +66,44 @@ func (o *Oracle) run() {
 	}
 }
 
+func (o *Oracle) lenMiner() int {
+	return len(o.miners.miners)
+}
+
 func (o *Oracle) getMiner(id int) *Miner {
 	return o.miners.miners[id]
 }
 
 func (o *Oracle) mineNextBlock() *Event {
 	nextstamp := o.timestamp
+	threshold := int64(math.Ceil(o.difficulty))
+	var residual float64
+
 	for {
 		r := o.random.Float64()
-		k := math.Log(r) / math.Log(1e-6)
-		if k > 3e6 {
-			nextstamp = nextstamp + int64(3e6)
+		fk := math.Log(r) / (- math.Log(o.difficulty))
+		k := int64(math.Ceil(fk))
+		residual = float64(k) - fk
+		if k > 3*threshold {
+			nextstamp = nextstamp + 3*threshold
 		} else {
-			nextstamp = nextstamp + int64(math.Ceil(k))
+			nextstamp = nextstamp + k
 			break
 		}
 	}
 
 	pickedID := sort.SearchFloat64s(o.miners.cumtable, o.random.Float64())
 
-	event := &Event{timestamp: nextstamp, etype: mineBlock, payload: pickedID}
-	return event
-}
-
-func (o *Oracle) recordNewBlock(minerID int, block *Block) {
-	block.index = len(o.blocks)
+	block := &Block{
+		index:    len(o.blocks),
+		minerID:  pickedID,
+		residual: residual,
+	}
 	for id, _ := range o.miners.miners {
 		block.seen[id] = false
 	}
-	block.seen[minerID] = true
-	block.miner = minerID
-
 	o.blocks = append(o.blocks, block)
+
+	event := &Event{timestamp: nextstamp, etype: mineBlock, payload: block}
+	return event
 }
