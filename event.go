@@ -14,6 +14,8 @@ type GenBlockEvent struct {
 }
 
 func (e *GenBlockEvent) run(o *Oracle) []*Event {
+	log.Infof("GenBlock Event : time %.2f, block %d, miner %d", o.getTime(), e.block.index, e.block.minerID)
+
 	miner := *o.getMiner(e.block.minerID)
 	e.block.seen[e.block.minerID] = true
 
@@ -30,6 +32,8 @@ type SendBlockEvent struct {
 }
 
 func (e *SendBlockEvent) run(o *Oracle) ([]*Event) {
+	log.Infof("SendBlock Event: time %.2f, block %d, receiver %d", o.getTime(), e.block.index, e.receiverID)
+
 	receiver := *o.getMiner(e.receiverID)
 	e.block.seen[e.receiverID] = true
 	return receiver.receiveBlock(e.block)
@@ -41,6 +45,8 @@ type BroadcastEvent struct {
 }
 
 func (e *BroadcastEvent) run(o *Oracle) ([]*Event) {
+	log.Infof("Broadcast Event: time %.2f, block %d, miner %d", o.getTime(), e.block.index, e.block.minerID)
+
 	network := *(o.network)
 
 	events := make([]*Event, 0)

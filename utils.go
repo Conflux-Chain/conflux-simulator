@@ -2,6 +2,8 @@ package main
 
 import (
 	"container/heap"
+	"os"
+	"./go-logging"
 )
 
 func UNUSED(v interface{}) {
@@ -43,4 +45,15 @@ func (eq EventQueue) Push(x *Event) {
 
 func (eq EventQueue) Pop() *Event {
 	return heap.Pop(eq.queueList).(*Event)
+}
+
+func loadLogger(level logging.Level) {
+	formatter := logging.MustStringFormatter(
+		"%{color}%{time:15:04:05.0000} [%{level:.4s}] %{shortfile: 19.19s} %{shortfunc: 15.15s} %{module: 5.5s}▶ %{color:reset}%{message} ",
+	)
+	backend := logging.AddModuleLevel(logging.NewBackendFormatter(logging.NewLogBackend(os.Stdout, "", 0), formatter))
+	backend.SetLevel(level, "")
+
+	// Set the backends to be used.
+	logging.SetBackend(backend)
 }

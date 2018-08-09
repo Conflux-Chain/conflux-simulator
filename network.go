@@ -7,7 +7,14 @@ type SimpleNetwork struct {
 }
 
 func (sn *SimpleNetwork) getDelay(toID int, block *Block) int64 {
-	if sn.isAttacker[block.minerID] || sn.isAttacker[toID] {
+	if block.minerID == 0 {
+		return 0
+	}
+
+	_, attks := sn.isAttacker[block.minerID]
+	_, attkr := sn.isAttacker[toID]
+
+	if attks || attkr {
 		return sn.attackerDelay
 	} else {
 		return sn.honestDelay
