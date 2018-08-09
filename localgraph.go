@@ -1,10 +1,15 @@
 package main
 
+import (
+	"container/list"
+)
+
 type DetailedBlock struct {
 	block    *Block
 	parent   *DetailedBlock
 	maxChild *DetailedBlock
 	weight   int
+	epoch    int
 }
 
 func (db *DetailedBlock) isPivot() bool {
@@ -161,6 +166,50 @@ func (g *LocalGraph) insert(block *Block) bool {
 			currentBlock = currentBlock.maxChild
 		}
 	}
-	g.checkConsistency()
+	//g.checkConsistency()
 	return true
+}
+
+func (g *LocalGraph) calculateEpoch() map[int]int {
+	epochs := make(map[int]int)
+
+	pivotBlock := g.pivotTip
+	for !pivotBlock.isGenesis() {
+		pivotBlock = pivotBlock.parent
+	}
+
+	epochs[pivotBlock.block.index] = 0
+	for pivotBlock.maxChild != nil {
+		pivotBlock = pivotBlock.maxChild
+		visitList := list.New()
+		epoch := pivotBlock.block.height
+		visitList.PushBack(pivotBlock)
+		for e := visitList.Front(); e != nil; e = e.Next() {
+			block := *(e.Value.(*DetailedBlock))
+			if _, ok := epochs[block.block.index]; ok {
+				continue
+			}
+			epochs[block.block.index] = epoch
+			for _, refblock := range block.block.references {
+				visitList.PushBack(refblock)
+			}
+		}
+	}
+
+	return epochs
+}
+
+func (g *LocalGraph) report() (int, int, int) {
+	weight := g.totalWeight
+	pivot := g.pivotTip.block.height
+	attackPivot := 0
+
+	pivotBlock := g.pivotTip
+	for !pivotBlock.isGenesis() {
+		if pivotBlock.block.minerID == 0 {
+			attackPivot = attackPivot + 1
+		}
+		pivotBlock = pivotBlock.parent
+	}
+	return weight, pivot, attackPivot
 }

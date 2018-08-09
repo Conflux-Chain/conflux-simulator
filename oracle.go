@@ -2,9 +2,8 @@ package main
 
 import (
 	"container/heap"
-	"math/rand"
-	"time"
 	"math"
+	"math/rand"
 	"sort"
 )
 
@@ -17,6 +16,7 @@ type Block struct {
 
 	// Maintained by Miner
 	height     int
+	ancestors  int //The number of ancestors doesn't include it self
 	parent     *Block
 	references []*Block
 
@@ -53,7 +53,6 @@ type Oracle struct {
 	timestamp     int64
 	timePrecision float64
 	rate          float64
-	random        *rand.Rand
 
 	duration int64
 }
@@ -65,13 +64,8 @@ func NewOracle(timePrecision float64, rate float64, duration float64) *Oracle {
 
 	miners := &MinerSet{miners: []*Miner{}, weights: []float64{}}
 
-	gensis := &Block{index: 0, minerID: -1, residual: 0, seen: make(map[int]bool)}
+	gensis := &Block{index: 0, minerID: -1, residual: 0, seen: make(map[int]bool), height: 0, ancestors: 0}
 	blocks := []*Block{gensis}
-
-	random := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
-	seed := int64(time.Now().Nanosecond())
-	random.Seed(seed)
-	log.Noticef("Random seed for this run: %d", seed)
 
 	return &Oracle{
 		queue:         queue,
@@ -82,7 +76,7 @@ func NewOracle(timePrecision float64, rate float64, duration float64) *Oracle {
 		timePrecision: timePrecision,
 		duration:      int64(timePrecision * duration),
 		rate:          rate,
-		random:        random}
+	}
 }
 
 func (o *Oracle) prepare() {
@@ -138,14 +132,6 @@ func (o *Oracle) addHonestMiner(weight float64) {
 	ms.weights = append(ms.weights, weight)
 }
 
-func (o *Oracle) setSimpleNetwork(normalDelay float64, fastDelay float64) {
-	*(o.network) = &SimpleNetwork{
-		honestDelay:   int64(normalDelay * o.timePrecision),
-		attackerDelay: int64(fastDelay * o.timePrecision),
-		isAttacker:    make(map[int]bool),
-	}
-}
-
 func (o *Oracle) mineNextBlock() *Event {
 	nextstamp := o.timestamp
 
@@ -154,7 +140,7 @@ func (o *Oracle) mineNextBlock() *Event {
 	var residual float64
 
 	for {
-		r := o.random.Float64()
+		r := rand.Float64()
 		fk := math.Log(r) / (math.Log(1 - 1/difficulty))
 		k := int64(math.Ceil(fk))
 		residual = float64(k) - fk
@@ -166,7 +152,7 @@ func (o *Oracle) mineNextBlock() *Event {
 		}
 	}
 
-	pickedID := sort.SearchFloat64s(o.miners.cumtable, o.random.Float64())
+	pickedID := sort.SearchFloat64s(o.miners.cumtable, rand.Float64())
 
 	block := &Block{
 		index:    len(o.blocks),

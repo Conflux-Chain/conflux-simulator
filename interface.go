@@ -7,7 +7,7 @@ type Miner interface {
 }
 
 type NetworkManager interface {
-	getDelay(int, *Block) int64
+	getDelay(int, *Block) float64
 }
 
 type Event interface {

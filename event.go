@@ -19,6 +19,11 @@ func (e *GenBlockEvent) run(o *Oracle) []*Event {
 	miner := *o.getMiner(e.block.minerID)
 	e.block.seen[e.block.minerID] = true
 
+	if e.block.index%500 == 0 {
+		blocks, heights, attack := (*o.miners.miners[1]).(*HonestMiner).graph.report()
+		log.Warningf("%d,%d,%d; %.3f, %.3f",
+			blocks, heights, attack, float64(heights)/float64(blocks), float64(attack)/float64(heights))
+	}
 	events := miner.generateBlock(e.block)
 
 	events = append(events, o.mineNextBlock())
@@ -53,8 +58,9 @@ func (e *BroadcastEvent) run(o *Oracle) ([]*Event) {
 	for receiverID, _ := range o.miners.miners {
 		if receiverID != e.block.minerID {
 			newevent := new(Event)
+			sendTime := o.timestamp + int64(network.getDelay(receiverID, e.block)*o.timePrecision)
 			*newevent = &SendBlockEvent{
-				BaseEvent:  BaseEvent{timestamp: o.timestamp + network.getDelay(receiverID, e.block)},
+				BaseEvent:  BaseEvent{sendTime},
 				block:      e.block,
 				receiverID: receiverID,
 			}
