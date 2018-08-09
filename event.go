@@ -1,73 +1,56 @@
 package main
 
-type EventType int
-
-type eventExecutor func(*Event, *Oracle) ([]*Event)
-
-const (
-	mineBlock        EventType = iota + 1
-	sendBlock
-	broadcastRequest
-	wakeNode
-)
-
-var executors = map[EventType]eventExecutor{
-	mineBlock:        mineBlockExec,
-	sendBlock:        sendBlockExec,
-	broadcastRequest: broadcastRequestExec,
-	wakeNode:         wakeNodeExec}
-
-type sendBlockPayload struct {
-	block      *Block
-	receiverID int
-}
-
-type Event struct {
+type BaseEvent struct {
 	timestamp int64
-	etype     EventType
-	payload   interface{}
-
-	index int
 }
 
-func (e *Event) Execute(o *Oracle) {
-	results := executors[e.etype](e, o)
-	for _, ev := range results {
-		if ev.timestamp >= o.timestamp {
-			o.queue.Push(ev)
-		}
-	}
+func (e *BaseEvent) getTimestamp() int64 {
+	return e.timestamp
 }
 
-func mineBlockExec(e *Event, o *Oracle) ([]*Event) {
-	block := e.payload.(*Block)
-	miner := *o.getMiner(block.minerID)
-	block.seen[block.minerID] = true
+type GenBlockEvent struct {
+	BaseEvent
+	block *Block
+}
 
-	events := miner.generateBlock(block)
+func (e *GenBlockEvent) run(o *Oracle) []*Event {
+	miner := *o.getMiner(e.block.minerID)
+	e.block.seen[e.block.minerID] = true
+
+	events := miner.generateBlock(e.block)
 
 	events = append(events, o.mineNextBlock())
 	return events
 }
 
-func sendBlockExec(e *Event, o *Oracle) ([]*Event) {
-	payload := e.payload.(sendBlockPayload)
-	receiver := *o.getMiner(payload.receiverID)
-	payload.block.seen[payload.receiverID] = true
-	return receiver.receiveBlock(payload.block)
+type SendBlockEvent struct {
+	BaseEvent
+	block      *Block
+	receiverID int
 }
 
-func broadcastRequestExec(e *Event, o *Oracle) ([]*Event) {
+func (e *SendBlockEvent) run(o *Oracle) ([]*Event) {
+	receiver := *o.getMiner(e.receiverID)
+	e.block.seen[e.receiverID] = true
+	return receiver.receiveBlock(e.block)
+}
+
+type BroadcastEvent struct {
+	BaseEvent
+	block *Block
+}
+
+func (e *BroadcastEvent) run(o *Oracle) ([]*Event) {
 	network := *(o.network)
-	block := e.payload.(*Block)
 
 	events := make([]*Event, 0)
 	for receiverID, _ := range o.miners.miners {
-		if receiverID != block.minerID {
-			newevent := &Event{
-				timestamp: o.timestamp + network.getDelay(receiverID, block),
-				etype:     sendBlock,
-				payload:   sendBlockPayload{block: block, receiverID: receiverID},
+		if receiverID != e.block.minerID {
+			newevent := new(Event)
+			*newevent = &SendBlockEvent{
+				BaseEvent:  BaseEvent{timestamp: o.timestamp + network.getDelay(receiverID, e.block)},
+				block:      e.block,
+				receiverID: receiverID,
 			}
 			events = append(events, newevent)
 		}
@@ -75,8 +58,12 @@ func broadcastRequestExec(e *Event, o *Oracle) ([]*Event) {
 	return events
 }
 
-func wakeNodeExec(e *Event, o *Oracle) ([]*Event) {
-	id := e.payload.(int)
-	miner := *o.getMiner(id)
+type wakeNodeEvent struct {
+	BaseEvent
+	minerId int
+}
+
+func (e *wakeNodeEvent) run(o *Oracle) ([]*Event) {
+	miner := *o.getMiner(e.minerId)
 	return miner.wake()
 }

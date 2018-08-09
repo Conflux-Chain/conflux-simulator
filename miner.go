@@ -156,13 +156,26 @@ type HonestMiner struct {
 	cache  *list.List
 }
 
-func (hm *HonestMiner) setup(id int, oracle *Oracle) {
-	hm.id = id
-	hm.oracle = oracle
+func NewHonestMiner(id int, oracle *Oracle) *HonestMiner {
+	graph := &LocalGraph{
+		ledger:      make(map[int]*DetailedBlock),
+		totalWeight: 0,
+		tips:        make(map[int]bool),
+		pivotTip:    nil,
+	}
+	cache := list.New()
+	return &HonestMiner{
+		id:     id,
+		oracle: oracle,
+		graph:  graph,
+		cache:  cache,
+	}
 }
 
 func (hm *HonestMiner) generateBlock(block *Block) []*Event {
+	// Miners can always seen the gensis block, so block.parent can't be empty
 	block.parent = hm.graph.pivotTip.block
+
 	block.references = make([]*Block, 0)
 	for index, _ := range hm.graph.tips {
 		if index != block.parent.index {
@@ -170,28 +183,28 @@ func (hm *HonestMiner) generateBlock(block *Block) []*Event {
 		}
 	}
 
-	broadcastEvent := &Event{
-		timestamp: hm.oracle.timestamp,
-		etype:     broadcastRequest,
-		payload:   block,
+	broadcastEvent := new(Event)
+	*broadcastEvent = &BroadcastEvent{
+		BaseEvent: BaseEvent{hm.oracle.timestamp},
+		block:     block,
 	}
 	return []*Event{broadcastEvent}
 }
 
 func (hm *HonestMiner) receiveBlock(block *Block) []*Event {
 	if hm.graph.insert(block) {
-		hm.updateCache()
+		hm.insertCache()
 	} else {
 		hm.cache.PushBack(block)
 	}
-	return nil
+	return []*Event{}
 }
 
 func (hm *HonestMiner) wake() []*Event {
-	return nil
+	return []*Event{}
 }
 
-func (hm *HonestMiner) updateCache() {
+func (hm *HonestMiner) insertCache() {
 	if hm.cache.Len() == 0 {
 		return
 	}
@@ -199,7 +212,11 @@ func (hm *HonestMiner) updateCache() {
 	for updated {
 		updated = false
 		for e := hm.cache.Front(); e != nil; e = e.Next() {
-			updated = updated || hm.graph.insert(e.Value.(*Block))
+			success := hm.graph.insert(e.Value.(*Block))
+			if success {
+				hm.cache.Remove(e)
+				updated = true
+			}
 		}
 	}
 }

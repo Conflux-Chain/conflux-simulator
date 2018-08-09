@@ -9,31 +9,40 @@ import (
 )
 
 type Block struct {
-	index      int
-	minerID    int
-	parent     *Block
-	references []*Block
-	children   []*Block
-
+	index    int
+	minerID  int
+	children []*Block
 	seen     map[int]bool
 	residual float64
-}
 
-type BlockLedger []*Block
+	parent     *Block
+	references []*Block
+}
 
 type MinerSet struct {
 	miners  []*Miner
 	weights []float64
 
-	// Initialized when oracle start
-	cumtable    []float64
-	defaultSeen map[int]bool
+	cumtable []float64
+}
+
+func (ms *MinerSet) normalize() {
+	totalweight := 0.0
+	for _, weight := range ms.weights {
+		totalweight = totalweight + weight
+	}
+	ratio := 0.0
+	ms.cumtable = make([]float64, len(ms.weights))
+	for id, weight := range ms.weights {
+		ratio = ratio + weight/totalweight
+		ms.cumtable[id] = ratio
+	}
 }
 
 type Oracle struct {
 	queue   *EventQueue
 	miners  *MinerSet
-	blocks  BlockLedger
+	blocks  []*Block
 	network *NetworkManager
 
 	timestamp  int64
@@ -61,8 +70,13 @@ func NewOracle() *Oracle {
 func (o *Oracle) run() {
 	for {
 		event := o.queue.Pop()
-		o.timestamp = event.timestamp
-		event.Execute(o)
+		o.timestamp = (*event).getTimestamp()
+		results := (*event).run(o)
+		for _, e := range results {
+			if (*e).getTimestamp() >= o.timestamp {
+				o.queue.Push(e)
+			}
+		}
 	}
 }
 
@@ -104,6 +118,14 @@ func (o *Oracle) mineNextBlock() *Event {
 	}
 	o.blocks = append(o.blocks, block)
 
-	event := &Event{timestamp: nextstamp, etype: mineBlock, payload: block}
-	return event
+	if block.parent != nil {
+		block.parent.children = append(block.parent.children, block)
+	}
+
+	newblockevent := new(Event)
+	*newblockevent = &GenBlockEvent{
+		BaseEvent: BaseEvent{nextstamp},
+		block:     block,
+	}
+	return newblockevent
 }
