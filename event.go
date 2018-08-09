@@ -46,7 +46,8 @@ func (e *SendBlockEvent) run(o *Oracle) ([]*Event) {
 
 type BroadcastEvent struct {
 	BaseEvent
-	block *Block
+	senderID int
+	block    *Block
 }
 
 func (e *BroadcastEvent) run(o *Oracle) ([]*Event) {
@@ -58,7 +59,7 @@ func (e *BroadcastEvent) run(o *Oracle) ([]*Event) {
 	for receiverID, _ := range o.miners.miners {
 		if receiverID != e.block.minerID {
 			newevent := new(Event)
-			sendTime := o.timestamp + int64(network.getDelay(receiverID, e.block)*o.timePrecision)
+			sendTime := o.timestamp + int64(network.getDelay(e.senderID, receiverID, e.block)*o.timePrecision)
 			*newevent = &SendBlockEvent{
 				BaseEvent:  BaseEvent{sendTime},
 				block:      e.block,
@@ -70,12 +71,12 @@ func (e *BroadcastEvent) run(o *Oracle) ([]*Event) {
 	return events
 }
 
-type wakeNodeEvent struct {
+type WakeNodeEvent struct {
 	BaseEvent
 	minerId int
 }
 
-func (e *wakeNodeEvent) run(o *Oracle) ([]*Event) {
+func (e *WakeNodeEvent) run(o *Oracle) ([]*Event) {
 	miner := *o.getMiner(e.minerId)
 	return miner.wake()
 }

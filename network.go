@@ -7,7 +7,7 @@ type SimpleNetwork struct {
 	isAttacker  map[int]bool
 }
 
-func (sn *SimpleNetwork) getDelay(toID int, block *Block) float64 {
+func (sn *SimpleNetwork) getDelay(fromID int, toID int, block *Block) float64 {
 	if block.minerID == -1 {
 		return 0
 	}

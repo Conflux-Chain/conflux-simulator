@@ -19,7 +19,7 @@ func exp1() *Oracle {
 		oracle.addHonestMiner(0.8 / 30)
 	}
 
-	network := new(NetworkManager)
+	network := new(Network)
 	*network = &SimpleNetwork{
 		honestDelay: 100,
 		attackerIn:  5,

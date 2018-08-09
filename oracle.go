@@ -15,10 +15,10 @@ type Block struct {
 	residual float64
 
 	// Maintained by Miner
-	height     int
-	ancestors  int //The number of ancestors doesn't include it self
-	parent     *Block
-	references []*Block
+	height      int
+	ancestorNum int //The number of ancestorNum doesn't include it self
+	parent      *Block
+	references  []*Block
 
 	// Maintained by miner of child block
 	children []*Block
@@ -48,13 +48,12 @@ type Oracle struct {
 	queue   *EventQueue
 	miners  *MinerSet
 	blocks  []*Block
-	network *NetworkManager
+	network *Network
 
 	timestamp     int64
 	timePrecision float64
 	rate          float64
-
-	duration int64
+	duration      int64
 }
 
 func NewOracle(timePrecision float64, rate float64, duration float64) *Oracle {
@@ -64,14 +63,14 @@ func NewOracle(timePrecision float64, rate float64, duration float64) *Oracle {
 
 	miners := &MinerSet{miners: []*Miner{}, weights: []float64{}}
 
-	gensis := &Block{index: 0, minerID: -1, residual: 0, seen: make(map[int]bool), height: 0, ancestors: 0}
+	gensis := &Block{index: 0, minerID: -1, residual: 0, seen: make(map[int]bool), height: 0, ancestorNum: 0}
 	blocks := []*Block{gensis}
 
 	return &Oracle{
 		queue:         queue,
 		miners:        miners,
 		blocks:        blocks,
-		network:       new(NetworkManager),
+		network:       new(Network),
 		timestamp:     0,
 		timePrecision: timePrecision,
 		duration:      int64(timePrecision * duration),

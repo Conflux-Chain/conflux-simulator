@@ -6,8 +6,8 @@ type Miner interface {
 	wake() ([]*Event)
 }
 
-type NetworkManager interface {
-	getDelay(int, *Block) float64
+type Network interface {
+	getDelay(int, int, *Block) float64
 }
 
 type Event interface {
