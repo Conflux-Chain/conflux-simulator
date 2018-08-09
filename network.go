@@ -1,9 +1,5 @@
 package main
 
-type NetworkManager interface {
-	getDelay(int, *Block) int64
-}
-
 type SimpleNetwork struct {
 	honestDelay   int64
 	attackerDelay int64

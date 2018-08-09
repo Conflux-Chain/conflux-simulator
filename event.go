@@ -42,6 +42,8 @@ func (e *Event) Execute(o *Oracle) {
 func mineBlockExec(e *Event, o *Oracle) ([]*Event) {
 	block := e.payload.(*Block)
 	miner := *o.getMiner(block.minerID)
+	block.seen[block.minerID] = true
+
 	events := miner.generateBlock(block)
 
 	events = append(events, o.mineNextBlock())
@@ -51,6 +53,7 @@ func mineBlockExec(e *Event, o *Oracle) ([]*Event) {
 func sendBlockExec(e *Event, o *Oracle) ([]*Event) {
 	payload := e.payload.(sendBlockPayload)
 	receiver := *o.getMiner(payload.receiverID)
+	payload.block.seen[payload.receiverID] = true
 	return receiver.receiveBlock(payload.block)
 }
 
