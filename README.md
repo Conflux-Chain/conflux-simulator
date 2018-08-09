@@ -118,11 +118,15 @@ func (o *Oracle) addHonestMiner(weight float64)
 ```
 ### Honest Miner
 TBA.
+
 ### Simple Network
 TBA.
+
 ### Local Graph
 TBA.
+
 ## Modification Guide
+
 ### Implement an attack strategy
 You can implement an attacker by writeing a struct implement `Miner` interface. Pay attention to following things.
 - `generateBlock(*Block)`: In this function, you should specify the `height`, `ancestorNum`, `parent` and `references` of this block. You also need to add this block to its the `children` of its parents. Don't touch the other parts of any blocks. The block pointers are shared by the oracle and all the miners. `oracle` will not check your behavior and prevent incorrect operation. But you can design your own local graph for free. 
