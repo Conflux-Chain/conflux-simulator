@@ -9,7 +9,6 @@ type DetailedBlock struct {
 	parent   *DetailedBlock
 	maxChild *DetailedBlock
 	weight   int
-	epoch    int
 }
 
 func (db *DetailedBlock) isPivot() bool {
@@ -31,13 +30,21 @@ func (db *DetailedBlock) getWeight(g *LocalGraph) float64 {
 type LocalGraph struct {
 	ledger      map[int]*DetailedBlock
 	totalWeight int
-	tips        map[int]bool
+	tips        *Set
 	pivotTip    *DetailedBlock
+	gensis      *DetailedBlock
 }
 
 func (g *LocalGraph) existing(block *Block) bool {
 	_, ok := g.ledger[block.index]
 	return ok
+}
+
+func (g *LocalGraph) getDetailedBlock(block *Block) *DetailedBlock {
+	if g.existing(block) {
+		return g.ledger[block.index]
+	}
+	return nil
 }
 
 func (g *LocalGraph) seenAllAncestors(block *Block) bool {
@@ -55,8 +62,19 @@ func (g *LocalGraph) seenAllAncestors(block *Block) bool {
 func (g *LocalGraph) getAllChildren(db *DetailedBlock) []*DetailedBlock {
 	answer := make([]*DetailedBlock, 0)
 	for _, childBlock := range db.block.children {
-		dChildBlock, ok := g.ledger[childBlock.index]
-		if ok {
+		dChildBlock := g.getDetailedBlock(childBlock)
+		if dChildBlock != nil {
+			answer = append(answer, dChildBlock)
+		}
+	}
+	return answer
+}
+
+func (g *LocalGraph) getAllRefChildren(db *DetailedBlock) []*DetailedBlock {
+	answer := make([]*DetailedBlock, 0)
+	for _, childBlock := range db.block.refChildren {
+		dChildBlock := g.getDetailedBlock(childBlock)
+		if dChildBlock != nil {
 			answer = append(answer, dChildBlock)
 		}
 	}
@@ -71,11 +89,11 @@ func (g *LocalGraph) updateTips(db *DetailedBlock) {
 		parents = append(db.block.references, db.block.parent)
 	}
 	for _, refBlock := range parents {
-		if _, ok := g.tips[refBlock.index]; ok {
-			delete(g.tips, refBlock.index)
+		if g.tips.Has(refBlock.index) {
+			g.tips.Remove(refBlock.index)
 		}
 	}
-	g.tips[db.block.index] = true
+	g.tips.Add(db.block.index)
 }
 
 func (g *LocalGraph) updateMaxChild(db *DetailedBlock) bool {
@@ -105,13 +123,38 @@ func (g *LocalGraph) updateMaxChild(db *DetailedBlock) bool {
 	}
 }
 
-func (g *LocalGraph) insert(block *Block) bool {
+func (g *LocalGraph) fillNewBlock(block *Block) {
+	block.parent = g.pivotTip.block
+	block.parent.children = append(block.parent.children, block)
+
+	block.height = block.parent.height + 1
+	block.ancestorNum = g.totalWeight
+
+	block.references = make([]*Block, 0)
+	for _, index := range g.tips.List() {
+		if index != block.parent.index {
+			refBlock := g.ledger[index].block
+			block.references = append(block.references, refBlock)
+			refBlock.refChildren = append(refBlock.refChildren, block)
+		}
+	}
+}
+
+type InsertResult int
+
+const (
+	Success  InsertResult = iota + 1
+	Fail
+	Existing
+)
+
+func (g *LocalGraph) insert(block *Block) InsertResult {
 	if g.existing(block) {
-		return true
+		return Existing
 	}
 
 	if !g.seenAllAncestors(block) {
-		return false
+		return Fail
 	}
 
 	g.totalWeight = g.totalWeight + 1
@@ -120,6 +163,7 @@ func (g *LocalGraph) insert(block *Block) bool {
 	if currentBlock.isGenesis() {
 		currentBlock.weight = g.totalWeight - currentBlock.weight
 		currentBlock.parent = nil
+		g.gensis = currentBlock
 	} else {
 		currentBlock.parent = g.ledger[currentBlock.block.parent.index]
 	}
@@ -129,7 +173,7 @@ func (g *LocalGraph) insert(block *Block) bool {
 
 	if currentBlock.isGenesis() {
 		g.pivotTip = currentBlock
-		return true
+		return Success
 	}
 
 	currentBlock = currentBlock.parent
@@ -166,17 +210,18 @@ func (g *LocalGraph) insert(block *Block) bool {
 			currentBlock = currentBlock.maxChild
 		}
 	}
-	//g.checkConsistency()
-	return true
+	g.checkConsistency()
+	return Success
 }
 
-func (g *LocalGraph) calculateEpoch() map[int]int {
+/**
+ * The following code are used for statistic.
+ */
+
+func (g *LocalGraph) getEpochs() map[int]int {
 	epochs := make(map[int]int)
 
-	pivotBlock := g.pivotTip
-	for !pivotBlock.isGenesis() {
-		pivotBlock = pivotBlock.parent
-	}
+	pivotBlock := g.gensis
 
 	epochs[pivotBlock.block.index] = 0
 	for pivotBlock.maxChild != nil {
@@ -191,7 +236,10 @@ func (g *LocalGraph) calculateEpoch() map[int]int {
 			}
 			epochs[block.block.index] = epoch
 			for _, refblock := range block.block.references {
-				visitList.PushBack(refblock)
+				visitList.PushBack(g.getDetailedBlock(refblock))
+			}
+			if !block.isGenesis() {
+				visitList.PushBack(block.parent)
 			}
 		}
 	}
@@ -199,7 +247,70 @@ func (g *LocalGraph) calculateEpoch() map[int]int {
 	return epochs
 }
 
-func (g *LocalGraph) report() (int, int, int) {
+func (g *LocalGraph) countAnti(c int) map[int]int {
+	epochMap := g.getEpochs()
+	numDesc := make(map[int]int)
+	result := make(map[int]int)
+	pivotWeight := make(map[int]int)
+
+	for index, epoch := range epochMap {
+		if epoch == 0 && index != 0 {
+			continue
+		}
+
+		visitList := list.New()
+		visitedSet := NewSet()
+		endEpoch := epoch + c
+		count := 0
+
+		visitList.PushBack(g.ledger[index])
+		for e := visitList.Front(); e != nil; e = e.Next() {
+			block := e.Value.(*DetailedBlock)
+			index := block.block.index
+			if visitedSet.Has(index) {
+				continue
+			}
+			visitedSet.Add(index)
+			if epochMap[index] > endEpoch {
+				continue
+			}
+
+			count += 1
+			children := g.getAllChildren(block)
+			refChildren := g.getAllRefChildren(block)
+			allChildren := append(refChildren, children...)
+			for _, refblock := range allChildren {
+				visitList.PushBack(refblock)
+			}
+		}
+		numDesc[index] = count
+	}
+
+	pivotBlock := g.gensis
+	pivotWeight[0] = 1
+	epoch := 0
+
+	for pivotBlock.maxChild != nil {
+		pivotBlock = pivotBlock.maxChild
+		epoch = epoch + 1
+		pivotWeight[epoch] = pivotBlock.block.ancestorNum + 1
+	}
+	maxEpoch := epoch
+
+	for index, descWeight := range numDesc {
+		if epochMap[index]+c <= maxEpoch {
+			result[index] = pivotWeight[epochMap[index]+c] - (g.ledger[index].block.ancestorNum + descWeight)
+		}
+	}
+
+	ii := 1003
+	if _, ok := numDesc[ii]; ok {
+		log.Warningf("Block %d have %d + %d in %d, %d anti", ii, g.ledger[ii].block.ancestorNum, numDesc[ii], pivotWeight[epochMap[ii]+c], result[ii])
+	}
+	return result
+}
+
+func (g *LocalGraph) report() {
 	weight := g.totalWeight
 	pivot := g.pivotTip.block.height
 	attackPivot := 0
@@ -211,5 +322,23 @@ func (g *LocalGraph) report() (int, int, int) {
 		}
 		pivotBlock = pivotBlock.parent
 	}
-	return weight, pivot, attackPivot
+
+	log.Warningf("%d,%d,%d; %.3f, %.3f",
+		weight, pivot, attackPivot, float64(pivot)/float64(weight), float64(attackPivot)/float64(pivot))
+}
+
+func (g *LocalGraph) report2(c int) {
+	anti := g.countAnti(c)
+
+	ab, aa, hb, ha := 0, 0, 0, 0
+	for index, num := range anti {
+		if g.ledger[index].block.minerID == 0 {
+			ab += 1
+			aa += num
+		} else {
+			hb += 1
+			ha += num
+		}
+	}
+	log.Warningf("N+%d Antiset, Attacker %.3f, Honest %.3f", c, float64(aa)/float64(ab), float64(ha)/float64(hb))
 }

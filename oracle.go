@@ -21,7 +21,8 @@ type Block struct {
 	references  []*Block
 
 	// Maintained by miner of child block
-	children []*Block
+	children    []*Block
+	refChildren []*Block
 }
 
 type MinerSet struct {
@@ -95,22 +96,22 @@ func (o *Oracle) prepare() {
 func (o *Oracle) run() {
 	for {
 		event := o.queue.Pop();
-		o.timestamp = (*event).getTimestamp()
+		o.timestamp = (*event).GetTimestamp()
 
 		if o.timestamp > o.duration {
 			break
 		}
 
-		results := (*event).run(o)
+		results := (*event).Run(o)
 		for _, e := range results {
-			if (*e).getTimestamp() >= o.timestamp {
+			if (*e).GetTimestamp() >= o.timestamp {
 				o.queue.Push(e)
 			}
 		}
 	}
 }
 
-func (o *Oracle) getTime() float64 {
+func (o *Oracle) getRealTime() float64 {
 	return float64(o.timestamp) / o.timePrecision
 }
 
@@ -131,8 +132,74 @@ func (o *Oracle) addHonestMiner(weight float64) {
 	ms.weights = append(ms.weights, weight)
 }
 
+func (o *Oracle) SetSimpleNetwork(attacker bool) {
+	isAttacker := NewSet()
+	if attacker {
+		isAttacker.Add(0)
+	}
+	*o.network = &SimpleNetwork{
+		oracle:      o,
+		honestDelay: honestDelay,
+		attackerIn:  attackerIn,
+		attackerOut: attackerOut,
+		isAttacker:  isAttacker,
+	}
+}
+
+func (o *Oracle) SetPeerNetwork() {
+	N := len(o.miners.miners)
+
+	peer := make(map[int]([]int))
+	sent := make(map[int]*Set)
+
+	for i := 0; i < N; i++ {
+		peer[i] = make([]int, 0)
+		sent[i] = NewSet()
+	}
+
+	// randomly set up peer connections, but should has the same order after replaying the simulation
+	for i := 0; i < N; i++ {
+		set := NewSet()
+		for _, p := range peer[i] {
+			set.Add(p)
+		}
+		for j := 0; j < peers-len(peer[i]); j++ {
+			for {
+				end := int(rand.Int31n(int32(N)))
+				if !set.Has(end) {
+					set.Add(end)
+					break
+				}
+			}
+		}
+		peer[i] = make([]int, 0)
+		// change set to array, so iteration returns the same order
+		list := set.List()
+		sort.Ints(list)
+		rand.Shuffle(len(list), func(i, j int) {
+			list[i], list[j] = list[j], list[i]
+		})
+		for _, p := range list {
+			peer[i] = append(peer[i], p)
+			if p > i {
+				peer[p] = append(peer[p], i)
+			}
+		}
+	}
+
+	*o.network = &PeerNetwork{
+		oracle:        o,
+		NET_TIME:      make([]float64, N),
+		peer:          peer,
+		sent:          sent,
+		blockSize:     blockSize,
+		globalLatency: globalLatency,
+		bandwidth:     bandwidth,
+	}
+}
+
 func (o *Oracle) mineNextBlock() *Event {
-	nextstamp := o.timestamp
+	nextStamp := o.timestamp
 
 	difficulty := o.timePrecision * o.rate
 	threshold := 3 * int64(math.Ceil(difficulty))
@@ -144,9 +211,9 @@ func (o *Oracle) mineNextBlock() *Event {
 		k := int64(math.Ceil(fk))
 		residual = float64(k) - fk
 		if k > threshold {
-			nextstamp = nextstamp + threshold
+			nextStamp = nextStamp + threshold
 		} else {
-			nextstamp = nextstamp + k
+			nextStamp = nextStamp + k
 			break
 		}
 	}
@@ -164,10 +231,10 @@ func (o *Oracle) mineNextBlock() *Event {
 	}
 	o.blocks = append(o.blocks, block)
 
-	newblockevent := new(Event)
-	*newblockevent = &GenBlockEvent{
-		BaseEvent: BaseEvent{nextstamp},
+	newBlockEvent := new(Event)
+	*newBlockEvent = &GenBlockEvent{
+		BaseEvent: BaseEvent{nextStamp},
 		block:     block,
 	}
-	return newblockevent
+	return newBlockEvent
 }

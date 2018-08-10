@@ -1,16 +1,24 @@
 package main
 
 type Miner interface {
-	receiveBlock(*Block) ([]*Event)
-	generateBlock(*Block) ([]*Event) //The block only need to specify the parent edge and ref edges.
-	wake() ([]*Event)
+	ReceiveBlock(*Block) ([]*Event)
+	GenerateBlock(*Block) ([]*Event) //The block only need to specify the parent edge and ref edges.
 }
 
 type Network interface {
-	getDelay(int, int, *Block) float64
+	Broadcast(int, *Block) []*Event
+	Relay(int, *Block) []*Event
 }
 
 type Event interface {
-	getTimestamp() int64
-	run(o *Oracle) []*Event
+	GetTimestamp() int64
+	Run(o *Oracle) []*Event
+}
+
+type BaseEvent struct {
+	timestamp int64
+}
+
+func (e *BaseEvent) GetTimestamp() int64 {
+	return e.timestamp
 }

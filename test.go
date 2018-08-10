@@ -30,6 +30,9 @@ func (g *LocalGraph) checkConsistency() {
 		for _, tip := range block.block.references {
 			tips[tip.index] = true
 		}
+		if !block.isGenesis() {
+			tips[block.block.parent.index] = true
+		}
 
 		for _, child := range children {
 			count2 = count2 + 1
@@ -71,12 +74,99 @@ func (g *LocalGraph) checkConsistency() {
 		log.Fatal("local graph error: pivot tip error")
 	}
 	for idx, having := range tips {
-		_, ok := g.tips[idx]
-		if ok && having {
-			log.Fatal("local graph error: find tip block outside tip list")
+		if !g.tips.Has(idx) && !having {
+			log.Fatalf("local graph error: find tip block %d outside tip list", idx)
 		}
-		if ok && having {
+		if g.tips.Has(idx) && having {
 			log.Fatal("local graph error: find non-tip block in tip list")
 		}
 	}
+}
+
+// A wrong implementation
+
+type VisitBlock struct {
+	index     int
+	visitList []*DetailedBlock
+	nextVisit int
+	weights   *CountMap
+	epoch     int
+}
+
+func NewVisitBlock(block *DetailedBlock, g *LocalGraph, epoch int) *VisitBlock {
+	return &VisitBlock{
+		index:     block.block.index,
+		visitList: g.getAllChildren(block),
+		nextVisit: 0,
+		weights:   NewCountMap(),
+		epoch:     epoch,
+	}
+}
+
+func (g *LocalGraph) __countLimitAnticone(c int) map[int]int {
+	epochs := g.getEpochs()
+	limitDesc := make(map[int]int)
+	pivotWeight := make(map[int]int)
+	result := make(map[int]int)
+
+	visitStack := NewStack()
+	visitStack.Push(NewVisitBlock(g.gensis, g, 0))
+
+	for {
+		v := visitStack.Peek().(*VisitBlock)
+		if v.nextVisit >= len(v.visitList) {
+			v.weights.Incur(v.epoch, 1)
+			limitDesc[v.index] = v.weights.Sum()
+			if v.epoch == 0 {
+				//for int, num := range *v.weights{
+				//	log.Notice(int,num)
+				//}
+				log.Noticef("run block %d", v.index)
+			}
+			visitStack.Pop()
+			if visitStack.Len() == 0 {
+				break
+			}
+			parent := visitStack.Peek().(*VisitBlock)
+
+			parent.weights.Merge(v.weights)
+			for epoch := v.epoch; epoch > parent.epoch; epoch -= 1 {
+				parent.weights.Remove(epoch + c)
+			}
+			parent.nextVisit += 1
+		} else {
+			nextBlock := v.visitList[v.nextVisit]
+			nextEpoch := epochs[nextBlock.block.index]
+			if nextEpoch == 0 && !nextBlock.isGenesis() {
+				v.nextVisit += 1
+			} else {
+				visitStack.Push(NewVisitBlock(nextBlock, g, nextEpoch))
+			}
+		}
+	}
+
+	pivotBlock := g.gensis
+	pivotWeight[0] = 1
+	epoch := 0
+
+	for pivotBlock.maxChild != nil {
+		pivotBlock = pivotBlock.maxChild
+		epoch = epoch + 1
+		pivotWeight[epoch] = pivotBlock.block.ancestorNum + 1
+	}
+	maxEpoch := epoch
+
+	for index, descWeight := range limitDesc {
+		if epochs[index]+c <= maxEpoch {
+			result[index] = pivotWeight[epochs[index]+c] - (g.ledger[index].block.ancestorNum + descWeight)
+		}
+	}
+	ii := 1003
+	if _, ok := limitDesc[ii]; ok {
+		log.Warningf("Gensis block have %d + %d in %d, %d anti", g.ledger[ii].block.ancestorNum, limitDesc[ii], pivotWeight[epochs[ii]+c], result[ii])
+
+	}
+
+	return result
+
 }

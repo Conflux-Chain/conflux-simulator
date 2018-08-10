@@ -7,26 +7,36 @@ import (
 )
 
 const loglevel = logging.WARNING
-const timePrecision = 1e5
+const (
+	timePrecision = 1e5
+	rate          = 5
+	duration      = 864000
+
+	//Parameter for Peer Network
+	blockSize     = 1   // 1MB
+	globalLatency = 0.3 // 0.3 second
+	bandwidth     = 20  //20 MBps
+	peers         = 16
+
+	//Paremeter for Simple Network
+	honestDelay = 100
+	attackerIn  = 5
+	attackerOut = 5
+)
 
 var log = logging.MustGetLogger("main")
 
 func exp1() *Oracle {
-	oracle := NewOracle(timePrecision, 5, 864000)
+	oracle := NewOracle(timePrecision, rate, duration)
 
 	oracle.addHonestMiner(0.2)
-	for i := 0; i < 30; i++ {
-		oracle.addHonestMiner(0.8 / 30)
+	for i := 0; i < 250; i++ {
+		oracle.addHonestMiner(0.8 / 250)
 	}
 
-	network := new(Network)
-	*network = &SimpleNetwork{
-		honestDelay: 100,
-		attackerIn:  5,
-		attackerOut: 5,
-		isAttacker:  map[int]bool{0:true},
-	}
-	oracle.network = network
+	//oracle.SetSimpleNetwork(true)
+	oracle.SetPeerNetwork()
+	log.Notice("done")
 
 	oracle.prepare()
 	oracle.run()
