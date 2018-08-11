@@ -1,18 +1,20 @@
 package main
 
 type Miner interface {
-	ReceiveBlock(*Block) ([]*Event)
-	GenerateBlock(*Block) ([]*Event) //The block only need to specify the parent edge and ref edges.
+	Setup(*Oracle, int)
+	ReceiveBlock(*Block) ([]Event)
+	GenerateBlock(*Block) ([]Event) //The block only need to specify the parent edge and ref edges.
 }
 
 type Network interface {
-	Broadcast(int, *Block) []*Event
-	Relay(int, *Block) []*Event
+	Setup(*Oracle)
+	Broadcast(int, *Block) []Event
+	Relay(int, *Block) []Event
 }
 
 type Event interface {
 	GetTimestamp() int64
-	Run(o *Oracle) []*Event
+	Run(o *Oracle) []Event
 }
 
 type BaseEvent struct {

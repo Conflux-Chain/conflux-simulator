@@ -11,56 +11,69 @@ type HonestMiner struct {
 	cache  *list.List
 }
 
-func NewHonestMiner(id int, oracle *Oracle) *HonestMiner {
-	graph := &LocalGraph{
-		ledger:      make(map[int]*DetailedBlock),
-		totalWeight: 0,
-		tips:        NewSet(),
-		pivotTip:    nil,
-	}
-	cache := list.New()
+func NewHonestMiner() *HonestMiner {
 	return &HonestMiner{
-		id:     id,
-		oracle: oracle,
-		graph:  graph,
-		cache:  cache,
+		graph: NewLocalGraph(),
+		cache: list.New(),
 	}
 }
 
-func (hm *HonestMiner) GenerateBlock(block *Block) []*Event {
+func (hm *HonestMiner) Setup(oracle *Oracle, id int) {
+	hm.oracle = oracle
+	hm.id = id
+}
+
+func (hm *HonestMiner) GenerateBlock(block *Block) []Event {
 	// Miners can always seen the gensis block, so block.parent can't be empty
 	hm.graph.fillNewBlock(block)
 	hm.graph.insert(block)
 
-	log.Noticef("Time %.2f, Miner %d mines %d, height %d, father %d",
-		hm.oracle.getRealTime(), hm.id, block.index, block.height, block.parent.index)
+	// For Log
+	refs := make([]int, len(block.references))
+	for idx, ref := range block.references {
+		refs[idx] = ref.index
+	}
+	if hm.id == 0 {
+		log.Infof("Time %.2f, Miner %d mines %d, height %d, father %d, refs %v",
+			hm.oracle.getRealTime(), hm.id, block.index, block.height, block.parent.index, refs)
+	}
 
-	network := *hm.oracle.network
+	network := hm.oracle.network
 	events := network.Broadcast(hm.id, block)
 
 	return events
 }
 
-func (hm *HonestMiner) ReceiveBlock(block *Block) []*Event {
-	network := *hm.oracle.network
-	events := make([]*Event, 0)
+func (hm *HonestMiner) ReceiveBlock(block *Block) []Event {
+	network := hm.oracle.network
+	events := make([]Event, 0)
+
+	if hm.id == 1 || hm.id == 0 {
+		log.Infof("Time %.2f, Miner %d receives %d (miner %d)", hm.oracle.getRealTime(), hm.id, block.index, block.minerID)
+	}
+
 	insertResult := hm.graph.insert(block)
+
 	if insertResult == Success {
 		results1 := network.Relay(hm.id, block)
-		results2 := hm.insertCache()
-		events = append(results1, results2...)
+		events = append(events, results1...)
+
+		cacheBlocks := hm.insertCache()
+		for _, cacheBlock := range cacheBlocks {
+			cacheResult := network.Relay(hm.id, cacheBlock)
+			events = append(events, cacheResult...)
+		}
 	} else if insertResult == Fail { // If there are ancestorNum haven't been received, put block to cache.
 		hm.cache.PushBack(block)
 	}
 	return events
 }
 
-func (hm *HonestMiner) insertCache() []*Event { // Insert blocks from cache to local graph
-	events := make([]*Event, 0)
-	network := *hm.oracle.network
+func (hm *HonestMiner) insertCache() []*Block { // Insert blocks from cache to local graph
+	results := make([]*Block, 0)
 
 	if hm.cache.Len() == 0 {
-		return []*Event{}
+		return results
 	}
 	updated := true
 	for updated {
@@ -71,12 +84,11 @@ func (hm *HonestMiner) insertCache() []*Event { // Insert blocks from cache to l
 			if insertResult != Fail {
 				hm.cache.Remove(e)
 				if insertResult == Success {
-					results := network.Relay(hm.id, block)
-					events = append(events, results...)
+					results = append(results, block)
 					updated = true
 				}
 			}
 		}
 	}
-	return events
+	return results
 }

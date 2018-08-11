@@ -7,21 +7,23 @@ type GenBlockEvent struct {
 	block *Block
 }
 
-func (e *GenBlockEvent) Run(o *Oracle) []*Event {
-	log.Infof("GenBlock  Event: time %.2f, block %d, miner %d", o.getRealTime(), e.block.index, e.block.minerID)
+func (e *GenBlockEvent) Run(o *Oracle) []Event {
+	log.Debugf("GenBlock  Event: time %.2f, block %d, miner %d", o.getRealTime(), e.block.index, e.block.minerID)
 
-	miner := *o.getMiner(e.block.minerID)
+	miner := o.getMiner(e.block.minerID)
 	e.block.seen[e.block.minerID] = true
 
-	if e.block.index%200 == 0 {
+	if e.block.index%250 == 0 {
 		t := float64(o.timestamp) / o.timePrecision
 		log.Warning("")
 		log.Warningf("Current time: %.2f s", t)
 
-		viewGraph := (*o.miners.miners[1]).(*HonestMiner).graph
+		viewGraph := o.miners.miners[1].(*HonestMiner).graph
+
+		log.Noticef("Pivot block %d", viewGraph.pivotTip.block.index)
 		viewGraph.report()
 
-		if e.block.index%200 == 0 {
+		if e.block.index%250 == 0 {
 			viewGraph.report2(20)
 		}
 
@@ -40,10 +42,10 @@ type SendBlockEvent struct {
 	receiverID int
 }
 
-func (e *SendBlockEvent) Run(o *Oracle) ([]*Event) {
-	log.Infof("SendBlock Event: time %.2f, block %d, receiver %d", o.getRealTime(), e.block.index, e.receiverID)
+func (e *SendBlockEvent) Run(o *Oracle) ([]Event) {
+	log.Debugf("SendBlock Event: time %.2f, block %d, receiver %d", o.getRealTime(), e.block.index, e.receiverID)
 
-	receiver := *o.getMiner(e.receiverID)
+	receiver := o.getMiner(e.receiverID)
 	e.block.seen[e.receiverID] = true
 	return receiver.ReceiveBlock(e.block)
 }

@@ -61,7 +61,7 @@ func (g *LocalGraph) checkConsistency() {
 			log.Fatalf("local graph error: max child consistency, say %v, find %v", block.maxChild, maxblock)
 		}
 		if block.isPivot() && totalWeight != block.weight+g.totalWeight {
-			log.Fatal("local graph error: weight consistency")
+			log.Fatalf("block %d, local graph error: weight consistency", block.block.index)
 		}
 		if !block.isPivot() && totalWeight != block.weight {
 			log.Fatal("local graph error: weight consistency")

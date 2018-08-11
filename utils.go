@@ -10,12 +10,12 @@ func UNUSED(v interface{}) {
 	_ = v
 }
 
-type PriorityQueue []*Event
+type PriorityQueue []Event
 
 func (pq PriorityQueue) Len() int { return len(pq) }
 
 func (pq PriorityQueue) Less(i, j int) bool {
-	return (*pq[i]).GetTimestamp() < (*pq[j]).GetTimestamp()
+	return pq[i].GetTimestamp() < pq[j].GetTimestamp()
 }
 
 func (pq PriorityQueue) Swap(i, j int) {
@@ -23,7 +23,7 @@ func (pq PriorityQueue) Swap(i, j int) {
 }
 
 func (pq *PriorityQueue) Push(x interface{}) {
-	item := x.(*Event)
+	item := x.(Event)
 	*pq = append(*pq, item)
 }
 
@@ -39,12 +39,12 @@ type EventQueue struct {
 	queueList *PriorityQueue
 }
 
-func (eq EventQueue) Push(x *Event) {
+func (eq EventQueue) Push(x Event) {
 	heap.Push(eq.queueList, x)
 }
 
-func (eq EventQueue) Pop() *Event {
-	return heap.Pop(eq.queueList).(*Event)
+func (eq EventQueue) Pop() Event {
+	return heap.Pop(eq.queueList).(Event)
 }
 
 func loadLogger(level logging.Level) {

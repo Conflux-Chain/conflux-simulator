@@ -35,6 +35,15 @@ type LocalGraph struct {
 	gensis      *DetailedBlock
 }
 
+func NewLocalGraph() *LocalGraph {
+	return &LocalGraph{
+		ledger:      make(map[int]*DetailedBlock),
+		totalWeight: 0,
+		tips:        NewSet(),
+		pivotTip:    nil,
+	}
+}
+
 func (g *LocalGraph) existing(block *Block) bool {
 	_, ok := g.ledger[block.index]
 	return ok
@@ -49,10 +58,12 @@ func (g *LocalGraph) getDetailedBlock(block *Block) *DetailedBlock {
 
 func (g *LocalGraph) seenAllAncestors(block *Block) bool {
 	if block.parent != nil && !g.existing(block.parent) {
+		//log.Criticalf("don't seen %d",block.parent.index)
 		return false
 	}
 	for _, refBlock := range block.references {
 		if !g.existing(refBlock) {
+			//log.Criticalf("don't seen %d",refBlock.index)
 			return false
 		}
 	}
@@ -247,7 +258,7 @@ func (g *LocalGraph) getEpochs() map[int]int {
 	return epochs
 }
 
-func (g *LocalGraph) countAnti(c int) map[int]int {
+func (g *LocalGraph) countAnti(c int) (map[int]int, map[int]int) {
 	epochMap := g.getEpochs()
 	numDesc := make(map[int]int)
 	result := make(map[int]int)
@@ -271,7 +282,7 @@ func (g *LocalGraph) countAnti(c int) map[int]int {
 				continue
 			}
 			visitedSet.Add(index)
-			if epochMap[index] > endEpoch {
+			if epochMap[index] > endEpoch || (epochMap[index] == 0 && index != 0) {
 				continue
 			}
 
@@ -300,38 +311,67 @@ func (g *LocalGraph) countAnti(c int) map[int]int {
 	for index, descWeight := range numDesc {
 		if epochMap[index]+c <= maxEpoch {
 			result[index] = pivotWeight[epochMap[index]+c] - (g.ledger[index].block.ancestorNum + descWeight)
+			// Debug log
+			if result[index] < 0 {
+				//	log.Criticalf("block %d, epoch %d, ancestor %d, desc %d, sub graph %d",
+				//		g.ledger[index].block.index, epochMap[index], g.ledger[index].block.ancestorNum, descWeight, pivotWeight[epochMap[index]+c])
+				//	log.Criticalf("pivot %d", g.pivotTip.block.index)
+				//
+				//	for id, _ := range make([]int, 15) {
+				//		refc := make([]int, len(g.getAllChildren(g.ledger[id])))
+				//		for idx, block := range g.getAllChildren(g.ledger[id]) {
+				//			refc[idx] = block.block.index
+				//		}
+				//		refr := make([]int, len(g.getAllRefChildren(g.ledger[id])))
+				//		for idx, block := range g.getAllRefChildren(g.ledger[id]) {
+				//			refr[idx] = block.block.index
+				//		}
+				//		log.Criticalf("block %d, epoch %v, refc %v, refr %v", id, epochMap[id], refc, refr)
+				//	}
+				log.Fatal("")
+			}
 		}
+
 	}
 
-	ii := 1003
-	if _, ok := numDesc[ii]; ok {
-		log.Warningf("Block %d have %d + %d in %d, %d anti", ii, g.ledger[ii].block.ancestorNum, numDesc[ii], pivotWeight[epochMap[ii]+c], result[ii])
-	}
-	return result
+	//For test only
+	//ii := 13
+	//if _, ok := result[ii]; ok {
+	//	log.Warningf("Block %d have %d + %d in %d, %d anti", ii, g.ledger[ii].block.ancestorNum, numDesc[ii], pivotWeight[epochMap[ii]+c], result[ii])
+	//}
+	return result, epochMap
 }
 
 func (g *LocalGraph) report() {
 	weight := g.totalWeight
 	pivot := g.pivotTip.block.height
 	attackPivot := 0
+	attackLastPivot := 0
 
 	pivotBlock := g.pivotTip
 	for !pivotBlock.isGenesis() {
 		if pivotBlock.block.minerID == 0 {
 			attackPivot = attackPivot + 1
+			if pivotBlock.block.height+1000 > g.pivotTip.block.height {
+				attackLastPivot = attackLastPivot + 1
+			}
 		}
 		pivotBlock = pivotBlock.parent
 	}
 
-	log.Warningf("%d,%d,%d; %.3f, %.3f",
-		weight, pivot, attackPivot, float64(pivot)/float64(weight), float64(attackPivot)/float64(pivot))
+	log.Warningf("%d(%d) pivot, %d attacker; ratio %.3f, %.3f;",
+		pivot, weight, attackPivot, float64(pivot)/float64(weight), float64(attackPivot)/float64(pivot))
 }
 
 func (g *LocalGraph) report2(c int) {
-	anti := g.countAnti(c)
+	anti, epoch := g.countAnti(c)
+	maxEpoch := g.pivotTip.block.height
 
 	ab, aa, hb, ha := 0, 0, 0, 0
 	for index, num := range anti {
+		if epoch[index] < maxEpoch-100 {
+			continue
+		}
 		if g.ledger[index].block.minerID == 0 {
 			ab += 1
 			aa += num
@@ -340,5 +380,5 @@ func (g *LocalGraph) report2(c int) {
 			ha += num
 		}
 	}
-	log.Warningf("N+%d Antiset, Attacker %.3f, Honest %.3f", c, float64(aa)/float64(ab), float64(ha)/float64(hb))
+	log.Warningf("N+%d Antiset in recent 100 epochs, Attacker %.3f, Honest %.3f", c, float64(aa)/float64(ab), float64(ha)/float64(hb))
 }
