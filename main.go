@@ -2,7 +2,6 @@ package main
 
 import (
 	"./go-logging"
-	_ "time"
 	"math/rand"
 	"time"
 )
@@ -38,23 +37,25 @@ var log = logging.MustGetLogger("main")
 
 func exp1() *Oracle {
 	log.Errorf("Start with attackR %.1f", attackerR)
+
 	oracle := NewOracle(timePrecision, rate, duration)
 	network := NewPeerNetwork(false)
+
 	//attacker := NewWithholdMiner(delayRef)
 	attacker := NewHonestMiner()
+
 	oracle.addMiner(attacker, attackerR)
 
 	for i := 0; i < honestMiners; i++ {
 		oracle.addHonestMiner((1 - attackerR) / honestMiners)
 	}
 
-	//oracle.SetSimpleNetwork(true)
 	oracle.setNetwork(network)
-
-	log.Notice("done")
 
 	oracle.prepare()
 	oracle.run()
+
+	log.Error("done")
 	return oracle
 }
 
@@ -65,7 +66,7 @@ func main() {
 	rand.Seed(seed)
 	log.Noticef("Random seed for this run: %d", seed)
 
-	attackerR = 0
+	attackerR = 0.1
 	exp1()
 	attackerR = 0.2
 	exp1()
@@ -73,6 +74,4 @@ func main() {
 	exp1()
 	attackerR = 0.4
 	exp1()
-
-	log.Notice("Done")
 }

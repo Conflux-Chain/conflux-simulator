@@ -33,10 +33,8 @@ func (hm *HonestMiner) GenerateBlock(block *Block) []Event {
 	for idx, ref := range block.references {
 		refs[idx] = ref.index
 	}
-	if hm.id == 0 {
-		log.Infof("Time %.2f, Miner %d mines %d, height %d, father %d, refs %v",
+	log.Infof("Time %.2f, Miner %d mines block %d, height %d, father %d, refs %v",
 			hm.oracle.getRealTime(), hm.id, block.index, block.height, block.parent.index, refs)
-	}
 
 	network := hm.oracle.network
 	events := network.Broadcast(hm.id, block)

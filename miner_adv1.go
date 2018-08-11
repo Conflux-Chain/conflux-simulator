@@ -56,8 +56,8 @@ func (wm *WithholdMiner) GenerateBlock(block *Block) []Event {
 		refs[idx] = ref.index
 	}
 
-	log.Noticef("Time %.2f, Miner %d mines %d, height %d, father %d, refs %v",
-		wm.oracle.getRealTime(), wm.id, block.index, block.height, block.parent.index, refs)
+	log.Noticef("Time %.2f, Adv Miner mines %d, height %d, father %d, refs %v",
+		wm.oracle.getRealTime(), block.index, block.height, block.parent.index, refs)
 
 	wm.holdingBlock.PushBack(block)
 	return wm.checkBroadCast()
@@ -71,9 +71,7 @@ func (wm *WithholdMiner) ReceiveBlock(block *Block) []Event {
 		return []Event{}
 	}
 
-	if wm.id == 0 {
-		log.Infof("Time %.2f, Miner %d receives %d", wm.oracle.getRealTime(), wm.id, block.index)
-	}
+	log.Infof("Time %.2f, Adv Miner receives %d", wm.oracle.getRealTime(), block.index)
 
 	insertResult := wm.realGraph.insert(block)
 
