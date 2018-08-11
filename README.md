@@ -136,7 +136,9 @@ func (o *Oracle) addMiner(miner Miner, weight float64)
 TBA.
 
 ## Modification Guide
+
 ### Implement an attack strategy
+
 You can implement an attacker by writeing a struct implement `Miner` interface. Pay attention to following things.
 - `generateBlock(*Block)`: In this function, you should specify the `height`, `ancestorNum`, `parent` and `references` of this block. You also need to add this block to its the `children`, `refChildren` of its `parent` and `references`. Don't touch the other parts of any blocks. The block pointers are shared by the oracle and all the miners. `oracle` will never check your behavior and prevent incorrect operation. But you can design your own local graph for free. 
 - `receiveBlock(*Block)`: Oracle may send the same block more than once or send a child earlier than its parent. Deal with such case carefully. 
