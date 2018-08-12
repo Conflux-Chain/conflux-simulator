@@ -64,8 +64,8 @@ func NewOracle(timePrecision float64, rate float64, duration float64) *Oracle {
 
 	miners := &MinerSet{miners: []Miner{}, weights: []float64{}}
 
-	gensis := &Block{index: 0, minerID: -1, residual: 0, seen: make(map[int]bool), height: 0, ancestorNum: 0}
-	blocks := []*Block{gensis}
+	genesis := &Block{index: 0, minerID: -1, residual: 0, seen: make(map[int]bool), height: 0, ancestorNum: 0}
+	blocks := []*Block{genesis}
 
 	return &Oracle{
 		queue:         queue,
@@ -85,11 +85,11 @@ func (o *Oracle) prepare() {
 	newBlockEvent := o.mineNextBlock()
 	o.queue.Push(newBlockEvent)
 
-	broadcastGensisEvent := &BroadcastEvent{
+	broadcastGenesisEvent := &BroadcastEvent{
 		BaseEvent: BaseEvent{0},
 		block:     o.blocks[0],
 	}
-	o.queue.Push(broadcastGensisEvent)
+	o.queue.Push(broadcastGenesisEvent)
 }
 
 func (o *Oracle) run() {

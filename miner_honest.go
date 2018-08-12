@@ -24,7 +24,7 @@ func (hm *HonestMiner) Setup(oracle *Oracle, id int) {
 }
 
 func (hm *HonestMiner) GenerateBlock(block *Block) []Event {
-	// Miners can always seen the gensis block, so block.parent can't be empty
+	// Miners can always seen the genesis block, so block.parent can't be empty
 	hm.graph.fillNewBlock(block)
 	hm.graph.insert(block)
 

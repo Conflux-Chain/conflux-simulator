@@ -32,7 +32,7 @@ type LocalGraph struct {
 	totalWeight int
 	tips        *Set
 	pivotTip    *DetailedBlock
-	gensis      *DetailedBlock
+	genesis      *DetailedBlock
 }
 
 func NewLocalGraph() *LocalGraph {
@@ -174,7 +174,7 @@ func (g *LocalGraph) insert(block *Block) InsertResult {
 	if currentBlock.isGenesis() {
 		currentBlock.weight = g.totalWeight - currentBlock.weight
 		currentBlock.parent = nil
-		g.gensis = currentBlock
+		g.genesis = currentBlock
 	} else {
 		currentBlock.parent = g.ledger[currentBlock.block.parent.index]
 	}
@@ -232,7 +232,7 @@ func (g *LocalGraph) insert(block *Block) InsertResult {
 func (g *LocalGraph) getEpochs() map[int]int {
 	epochs := make(map[int]int)
 
-	pivotBlock := g.gensis
+	pivotBlock := g.genesis
 
 	epochs[pivotBlock.block.index] = 0
 	for pivotBlock.maxChild != nil {
@@ -297,7 +297,7 @@ func (g *LocalGraph) countAnti(c int) (map[int]int, map[int]int) {
 		numDesc[index] = count
 	}
 
-	pivotBlock := g.gensis
+	pivotBlock := g.genesis
 	pivotWeight[0] = 1
 	epoch := 0
 

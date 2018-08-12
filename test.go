@@ -8,7 +8,7 @@ func (g *LocalGraph) checkConsistency() {
 
 	tips := make(map[int]bool)
 	if g.ledger[0].weight != 0 {
-		log.Fatal("local graph error: gensis error")
+		log.Fatal("local graph error: genesis error")
 	}
 	for id, block := range g.ledger {
 		count = count + 1
@@ -110,7 +110,7 @@ func (g *LocalGraph) __countLimitAnticone(c int) map[int]int {
 	result := make(map[int]int)
 
 	visitStack := NewStack()
-	visitStack.Push(NewVisitBlock(g.gensis, g, 0))
+	visitStack.Push(NewVisitBlock(g.genesis, g, 0))
 
 	for {
 		v := visitStack.Peek().(*VisitBlock)
@@ -145,7 +145,7 @@ func (g *LocalGraph) __countLimitAnticone(c int) map[int]int {
 		}
 	}
 
-	pivotBlock := g.gensis
+	pivotBlock := g.genesis
 	pivotWeight[0] = 1
 	epoch := 0
 
@@ -163,7 +163,7 @@ func (g *LocalGraph) __countLimitAnticone(c int) map[int]int {
 	}
 	ii := 1003
 	if _, ok := limitDesc[ii]; ok {
-		log.Warningf("Gensis block have %d + %d in %d, %d anti", g.ledger[ii].block.ancestorNum, limitDesc[ii], pivotWeight[epochs[ii]+c], result[ii])
+		log.Warningf("Genesis block have %d + %d in %d, %d anti", g.ledger[ii].block.ancestorNum, limitDesc[ii], pivotWeight[epochs[ii]+c], result[ii])
 
 	}
 

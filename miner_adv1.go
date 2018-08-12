@@ -38,7 +38,7 @@ func (wm *WithholdMiner) Setup(oracle *Oracle, id int) {
 }
 
 func (wm *WithholdMiner) GenerateBlock(block *Block) []Event {
-	// Miners can always seen the gensis block, so block.parent can't be empty
+	// Miners can always seen the genesis block, so block.parent can't be empty
 	if wm.mType == selfish {
 		block.parent = wm.graph.pivotTip.block
 		block.parent.children = append(block.parent.children, block)
