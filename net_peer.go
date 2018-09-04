@@ -20,7 +20,7 @@ type PeerNetwork struct {
 	attackerIn  float64
 	attackerOut float64
 
-	startTime map[int]int64
+	startTime map[int]int64 //For Log Only
 	endTime   map[int]int64
 }
 
@@ -144,7 +144,7 @@ func (pn *PeerNetwork) toTimestamp(t float64) int64 {
 }
 
 func (pn *PeerNetwork) sendBlockToBestPeer(e *PeerSendEvent) []Event {
-	result := []Event{}
+	var result []Event
 	sender := e.senderID
 	block := e.block
 	currentTS := pn.oracle.getRealTime()
@@ -226,7 +226,7 @@ func (pn *PeerNetwork) expressBroadcast(block *Block) []Event {
 		return []Event{}
 	}
 	result := make([]Event, 0)
-	for receiver, _ := range pn.sent {
+	for receiver := range pn.sent {
 		if receiver == block.minerID {
 			continue
 		}

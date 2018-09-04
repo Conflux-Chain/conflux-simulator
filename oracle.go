@@ -94,7 +94,7 @@ func (o *Oracle) prepare() {
 
 func (o *Oracle) run() {
 	for {
-		event := o.queue.Pop();
+		event := o.queue.Pop()
 		o.timestamp = event.GetTimestamp()
 
 		if o.timestamp > o.duration {
@@ -170,7 +170,7 @@ func (o *Oracle) mineNextBlock() Event {
 		residual: residual,
 		seen:     make(map[int]bool),
 	}
-	for id, _ := range o.miners.miners {
+	for id := range o.miners.miners {
 		block.seen[id] = false
 	}
 	o.blocks = append(o.blocks, block)

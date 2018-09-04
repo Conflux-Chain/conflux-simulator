@@ -170,7 +170,7 @@ func (s *Set) IsEmpty() bool {
 }
 
 func (s *Set) List() []int {
-	list := []int{}
+	var list []int
 	for item := range s.m {
 		list = append(list, item)
 	}

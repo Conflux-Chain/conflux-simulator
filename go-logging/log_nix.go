@@ -78,7 +78,7 @@ func (b *LogBackend) Log(level Level, calldepth int, rec *Record) error {
 // ConvertColors takes a list of ints representing colors for log levels and
 // converts them into strings for ANSI color formatting
 func ConvertColors(colors []int, bold bool) []string {
-	converted := []string{}
+	var converted []string
 	for _, i := range colors {
 		if bold {
 			converted = append(converted, ColorSeqBold(color(i)))

@@ -221,7 +221,10 @@ func (g *LocalGraph) insert(block *Block) InsertResult {
 			currentBlock = currentBlock.maxChild
 		}
 	}
-	g.checkConsistency()
+	if debug{
+		g.checkConsistency()
+	}
+
 	return Success
 }
 

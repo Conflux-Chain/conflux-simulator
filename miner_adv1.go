@@ -137,7 +137,7 @@ func (wm *WithholdMiner) insertCache() []Event { // Insert blocks from cache to 
 		return []Event{}
 	}
 	updated := true
-	results := []Event{}
+	var results []Event
 	for updated {
 		updated = false
 		for e := wm.cache.Front(); e != nil; e = e.Next() {

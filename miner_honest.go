@@ -46,7 +46,7 @@ func (hm *HonestMiner) ReceiveBlock(block *Block) []Event {
 	network := hm.oracle.network
 	events := make([]Event, 0)
 
-	if hm.id == 1 || hm.id == 0 {
+	if hm.id == 0 {
 		log.Infof("Time %.2f, Miner %d receives %d (miner %d)", hm.oracle.getRealTime(), hm.id, block.index, block.minerID)
 	}
 

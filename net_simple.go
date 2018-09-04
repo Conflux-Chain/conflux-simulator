@@ -64,7 +64,7 @@ func (e *BroadcastEvent) Run(o *Oracle) ([]Event) {
 	log.Debugf("Broadcast Event: time %.2f, block %d, miner %d", o.getRealTime(), e.block.index, e.block.minerID)
 
 	events := make([]Event, 0)
-	for receiverID, _ := range o.miners.miners {
+	for receiverID := range o.miners.miners {
 		if receiverID != e.block.minerID {
 			sendTime := o.timestamp + int64(e.network.getDelay(e.senderID, receiverID, e.block)*o.timePrecision)
 			sendEvent := &SendBlockEvent{
