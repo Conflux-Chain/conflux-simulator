@@ -93,17 +93,20 @@ func run() *Oracle {
 }
 
 func flagParse() {
-	debug_ = *flag.Bool("d", false, "debug")
-	hasAttacker_ = *flag.Bool("a", false, "attacker")
-	logLevel_ = *flag.Int("l", 3, "Log Level")
-	attacker_ = *flag.Float64("r", 0.2, "Attacker ratio")
-	localRatio_ = *flag.Float64("local", 0.2, "Local ratio")
-	bandwidth_ = *flag.Float64("band", 7.5, "Bandwidth(Mbps)")
-	peers_ = *flag.Int("peer", 10, "Number of peers")
-	duration_ = rate * *flag.Float64("t", 600, "Duration (in blocks)")
+	flag.BoolVar(&debug_, "d", false, "debug")
+	flag.BoolVar(&hasAttacker_, "a", false, "attacker")
+	flag.IntVar(&logLevel_, "l", 3, "Log Level")
+	flag.Float64Var(&attacker_, "r", 0.2, "Attacker ratio")
+	flag.Float64Var(&localRatio_, "local", 0.2, "Local ratio")
+	flag.Float64Var(&bandwidth_, "band", 7.5, "Bandwidth(Mbps)")
+	flag.IntVar(&peers_, "peer", 10, "Number of peers")
 
-	networkType_ = NetworkType(*flag.Int("net", 3, "Attacker ratio"))
+	nettype := flag.Int("net", 3, "Network type")
+	durblocks := flag.Float64("t", 600, "Duration (in blocks)")
 	flag.Parse()
+
+	networkType_ = NetworkType(*nettype)
+	duration_ = *durblocks * rate
 }
 func main() {
 	flagParse()
