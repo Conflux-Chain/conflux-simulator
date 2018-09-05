@@ -26,7 +26,7 @@ func NewBitcoinNetwork(attacker bool) *BitcoinNetwork {
 	}
 
 	return &BitcoinNetwork{
-		bandwidth:  bandwidth,
+		bandwidth:  bandwidth_,
 		verifyTime: 0.01,
 
 		attacker: isAttacker,
@@ -58,16 +58,13 @@ func (bn *BitcoinNetwork) Setup(o *Oracle) {
 		for _, p := range peer[i] {
 			set.Add(p)
 		}
-		for j := 0; j < peers-len(peer[i]); j++ {
+		for j := 0; j < peers_-len(peer[i]); j++ {
 			for {
 				end := int(rand.Int31n(int32(N)))
 				if !set.Has(end) {
 					invN := float64(1.0 / float64(geoN))
-					if geo[i] == geo[end] || rand.Float64() < (invN*(1-localRatio)/localRatio)/(1-invN) {
+					if geo[i] == geo[end] || rand.Float64() < (invN*(1-localRatio_)/localRatio_)/(1-invN) {
 						set.Add(end)
-						if i == 0 {
-							log.Notice(geo[i] == geo[end])
-						}
 						break
 					}
 				}
@@ -129,6 +126,25 @@ func (bn *BitcoinNetwork) expressRelay(block *Block) []Event {
 	}
 	return result
 }
+
+func (bn *BitcoinNetwork) expressBroadcast(block *Block) []Event {
+	result := make([]Event, 0)
+	for receiver := range bn.oracle.miners.miners {
+		if receiver == block.minerID {
+			continue
+		}
+		sendEvent := &SendBlockEvent{
+			BaseEvent:  BaseEvent{bn.oracle.timestamp + 1},
+			receiverID: receiver,
+			block:      block,
+		}
+		bn.sent[receiver].Add(block.index)
+		bn.inFlight[receiver].Add(block.index)
+		result = append(result, sendEvent)
+	}
+	return result
+}
+
 
 func (bn *BitcoinNetwork) sendToAllPeer(senderID int, block *Block) []Event {
 	results := make([]Event, 0)

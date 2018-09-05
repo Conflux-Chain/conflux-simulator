@@ -33,7 +33,7 @@ func NewPeerNetwork(attacker bool) *PeerNetwork {
 	return &PeerNetwork{
 		blockSize:     blockSize,
 		globalLatency: globalLatency,
-		bandwidth:     bandwidth,
+		bandwidth:     bandwidth_,
 
 		attacker:    isAttacker,
 		attackerIn:  attackerIn,
@@ -63,7 +63,7 @@ func (pn *PeerNetwork) Setup(o *Oracle) {
 		for _, p := range peer[i] {
 			set.Add(p)
 		}
-		for j := 0; j < peers-len(peer[i]); j++ {
+		for j := 0; j < peers_-len(peer[i]); j++ {
 			for {
 				end := int(rand.Int31n(int32(N)))
 				if !set.Has(end) {

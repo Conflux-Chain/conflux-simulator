@@ -5,24 +5,26 @@ import (
 	"math/rand"
 	"time"
 	"math"
+	"flag"
 )
 
-const logLevel = logging.NOTICE
-const debug = false
-
-var networkType = BitcoinNet
-var attackerR = 0.
-
-const hasAttacker = false
+var (
+	logLevel_    int
+	debug_       bool
+	networkType_ NetworkType
+	hasAttacker_ bool
+	attacker_    float64
+)
 
 const (
 	honestMiners = 10000
 
 	timePrecision = 1e6
-	rate          = 5
-	blockSize     = 4 // 1MB
-	duration      = 600 * rate
+	rate          = 5.0
+	blockSize     = 4.0 // 1MB
 )
+
+var duration_ = 600 * rate
 
 const (
 	//Parameters for Simple Network
@@ -31,15 +33,16 @@ const (
 
 	//Parameter for Peer Network
 	globalLatency = 0.3 // 0.3 second
-	bandwidth     = 7.5 //20 Mbps
-	peers         = 10
 
 	//Parameters for Simple and Peer with attacker
 	attackerIn  = 2
 	attackerOut = 2
+)
 
-	//Parameters for Bitcoin Network
-	localRatio = 0.1
+var (
+	localRatio_ = 0.1 //Parameters for Bitcoin Network
+	bandwidth_  = 7.5 //20 Mbps
+	peers_      = 10
 )
 
 type NetworkType int
@@ -65,13 +68,13 @@ func getNetwork(t NetworkType, attacker bool) Network {
 }
 
 func run() *Oracle {
-	oracle := NewOracle(timePrecision, rate, duration)
-	network := getNetwork(networkType, hasAttacker)
+	oracle := NewOracle(timePrecision, rate, duration_)
+	network := getNetwork(networkType_, hasAttacker_)
 
-	if hasAttacker {
+	if hasAttacker_ {
 		attacker := NewHonestMiner()
 		//attacker := NewWithholdMiner(delayRef)
-		oracle.addMiner(attacker, attackerR/(1-attackerR))
+		oracle.addMiner(attacker, attacker_/(1-attacker_))
 	}
 
 	ratio := 0.8
@@ -89,10 +92,25 @@ func run() *Oracle {
 	return oracle
 }
 
+func flagParse() {
+	debug_ = *flag.Bool("d", false, "debug")
+	hasAttacker_ = *flag.Bool("a", false, "attacker")
+	logLevel_ = *flag.Int("l", 3, "Log Level")
+	attacker_ = *flag.Float64("r", 0.2, "Attacker ratio")
+	localRatio_ = *flag.Float64("local", 0.2, "Local ratio")
+	bandwidth_ = *flag.Float64("band", 7.5, "Bandwidth(Mbps)")
+	peers_ = *flag.Int("peer", 10, "Number of peers")
+	duration_ = rate * *flag.Float64("t", 600, "Duration (in blocks)")
+
+	networkType_ = NetworkType(*flag.Int("net", 3, "Attacker ratio"))
+	flag.Parse()
+}
 func main() {
-	loadLogger(logLevel)
+	flagParse()
+	loadLogger(logging.Level(logLevel_))
+
 	var seed int64
-	if debug {
+	if debug_ {
 		seed = int64(249020116)
 	} else {
 		seed = int64(time.Now().Nanosecond())

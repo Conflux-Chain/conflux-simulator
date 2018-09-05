@@ -221,7 +221,7 @@ func (g *LocalGraph) insert(block *Block) InsertResult {
 			currentBlock = currentBlock.maxChild
 		}
 	}
-	if debug {
+	if debug_ {
 		g.checkConsistency()
 	}
 
@@ -385,12 +385,12 @@ func (g *LocalGraph) report_anti(c int) (CountMap, CountMap) {
 		antiSum.Incur(id, num)
 	}
 
-	if hasAttacker {
+	if hasAttacker_ {
 		log.Warningf("N+%d Antiset in recent 100 epochs, Attacker %.3f, Honest %.3f", c,
 			float64(antiSum[0])/float64(blockCnt[0]),
 			float64(antiSum.Sum()-antiSum[0])/float64(blockCnt.Sum()-blockCnt[0]))
 	} else {
-		log.Warningf("N+%d Antiset in recent 100 epochs, Honest %.3f", c, float64(antiSum.Sum())/float64(blockCnt.Sum()))
+		log.Warningf("N+%d Antiset in recent 100 epochs, %.3f", c, float64(antiSum.Sum())/float64(blockCnt.Sum()))
 	}
 	return blockCnt, antiSum
 }
