@@ -31,7 +31,7 @@ func NewPeerNetwork(attacker bool) *PeerNetwork {
 	}
 
 	return &PeerNetwork{
-		blockSize:     blockSize,
+		blockSize:     blockSize_,
 		globalLatency: globalLatency,
 		bandwidth:     bandwidth_,
 

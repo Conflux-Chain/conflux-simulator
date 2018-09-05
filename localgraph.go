@@ -354,9 +354,6 @@ func (g *LocalGraph) report_pivot() (CountMap, CountMap, CountMap) {
 	for !pivotBlock.isGenesis() {
 		pivotCnt.Incur(pivotBlock.block.minerID, 1)
 		pivotRefSum.Incur(pivotBlock.block.minerID, len(pivotBlock.block.references))
-		if pivotBlock.block.height+1000 > g.pivotTip.block.height {
-			lastPivotCnt.Incur(pivotBlock.block.minerID, 1)
-		}
 		pivotBlock = pivotBlock.parent
 	}
 
@@ -397,5 +394,11 @@ func (g *LocalGraph) report_anti(c int) (CountMap, CountMap) {
 
 func (g *LocalGraph) report_epochsize() CountMap {
 	_, size := g.getEpochs()
+	pivotHeight := g.pivotTip.block.height
+	sum := 0
+	for i := 0; i < 100; i += 1 {
+		sum += size.Get(pivotHeight - i)
+	}
+	log.Warningf("Last 100 epochs have %d blocks", sum)
 	return size
 }

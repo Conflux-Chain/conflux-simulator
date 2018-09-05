@@ -11,7 +11,7 @@ run*
 *.dll
 *.so
 *.dylib
-conflux-simulator
+conflux-simulator*
 
 # Test binary, build with `go test -c`
 *.test

@@ -13,7 +13,7 @@ func (e *GenBlockEvent) Run(o *Oracle) []Event {
 	miner := o.getMiner(e.block.minerID)
 	e.block.seen[e.block.minerID] = true
 
-	if e.block.index%20 == 0 {
+	if e.block.index%50 == 0 {
 		t := float64(o.timestamp) / o.timePrecision
 		log.Warning("")
 		log.Warningf("Current time: %.2f s", t)
@@ -23,8 +23,9 @@ func (e *GenBlockEvent) Run(o *Oracle) []Event {
 		log.Noticef("Pivot block %d", viewGraph.pivotTip.block.index)
 		viewGraph.report_pivot()
 
-		if e.block.index%20 == 0 {
+		if e.block.index%50 == 0 {
 			viewGraph.report_anti(20)
+			viewGraph.report_epochsize()
 		}
 
 		time.Sleep(1 * time.Millisecond)

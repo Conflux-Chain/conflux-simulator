@@ -91,8 +91,6 @@ func (bn *BitcoinNetwork) Setup(o *Oracle) {
 	bn.inFlight = inFlight
 	bn.nextTime = nextTime
 	bn.geo = geo
-
-	log.Warning("Init Done")
 }
 
 func (bn *BitcoinNetwork) Broadcast(senderID int, block *Block) []Event {
@@ -144,7 +142,6 @@ func (bn *BitcoinNetwork) expressBroadcast(block *Block) []Event {
 	}
 	return result
 }
-
 
 func (bn *BitcoinNetwork) sendToAllPeer(senderID int, block *Block) []Event {
 	results := make([]Event, 0)
@@ -225,7 +222,7 @@ func (e *INVPacketEvent) Run(o *Oracle) []Event {
 			senderID:   e.receiverID,
 			receiverID: e.senderID,
 			network:    e.network,
-			size:       blockSize * mb,
+			size:       int(blockSize_ * mb),
 		},
 		block: o.blocks[e.blockID],
 	}
