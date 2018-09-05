@@ -62,10 +62,10 @@ func (bn *BitcoinNetwork) Setup(o *Oracle) {
 			for {
 				end := int(rand.Int31n(int32(N)))
 				if !set.Has(end) {
-					invN := float64(1.0/float64(geoN))
+					invN := float64(1.0 / float64(geoN))
 					if geo[i] == geo[end] || rand.Float64() < (invN*(1-localRatio)/localRatio)/(1-invN) {
 						set.Add(end)
-						if i== 0 {
+						if i == 0 {
 							log.Notice(geo[i] == geo[end])
 						}
 						break
@@ -102,7 +102,9 @@ func (bn *BitcoinNetwork) Broadcast(senderID int, block *Block) []Event {
 	bn.sent[senderID].Add(block.index)
 	bn.inFlight[senderID].Add(block.index)
 
-	return bn.sendToAllPeer(senderID, block)
+	attackerRelay := bn.expressRelay(block)
+
+	return append(bn.sendToAllPeer(senderID, block), attackerRelay...)
 }
 
 func (bn *BitcoinNetwork) Relay(senderID int, block *Block) []Event {
@@ -110,6 +112,22 @@ func (bn *BitcoinNetwork) Relay(senderID int, block *Block) []Event {
 	bn.inFlight[senderID].Add(block.index)
 
 	return bn.sendToAllPeer(senderID, block)
+}
+
+func (bn *BitcoinNetwork) expressRelay(block *Block) []Event {
+	result := make([]Event, 0)
+	for _, attacker := range bn.attacker.List() {
+		sendEvent := &SendBlockEvent{
+			BaseEvent:  BaseEvent{bn.oracle.timestamp + 1},
+			receiverID: attacker,
+			block:      block,
+		}
+		//log.Criticalf("express block %d", block.index)
+		bn.sent[attacker].Add(block.index)
+		bn.inFlight[attacker].Add(block.index)
+		result = append(result, sendEvent)
+	}
+	return result
 }
 
 func (bn *BitcoinNetwork) sendToAllPeer(senderID int, block *Block) []Event {

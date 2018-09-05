@@ -21,10 +21,10 @@ func (e *GenBlockEvent) Run(o *Oracle) []Event {
 		viewGraph := o.miners.miners[1].(*HonestMiner).graph
 
 		log.Noticef("Pivot block %d", viewGraph.pivotTip.block.index)
-		viewGraph.report()
+		viewGraph.report_pivot()
 
 		if e.block.index%50 == 0 {
-			viewGraph.report2(20)
+			viewGraph.report_anti(20)
 		}
 
 		time.Sleep(1 * time.Millisecond)

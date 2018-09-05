@@ -32,7 +32,7 @@ type LocalGraph struct {
 	totalWeight int
 	tips        *Set
 	pivotTip    *DetailedBlock
-	genesis      *DetailedBlock
+	genesis     *DetailedBlock
 }
 
 func NewLocalGraph() *LocalGraph {
@@ -221,7 +221,7 @@ func (g *LocalGraph) insert(block *Block) InsertResult {
 			currentBlock = currentBlock.maxChild
 		}
 	}
-	if debug{
+	if debug {
 		g.checkConsistency()
 	}
 
@@ -232,8 +232,9 @@ func (g *LocalGraph) insert(block *Block) InsertResult {
  * The following code are used for statistic.
  */
 
-func (g *LocalGraph) getEpochs() map[int]int {
+func (g *LocalGraph) getEpochs() (map[int]int, CountMap) {
 	epochs := make(map[int]int)
+	epochCnt := make(CountMap)
 
 	pivotBlock := g.genesis
 
@@ -249,6 +250,7 @@ func (g *LocalGraph) getEpochs() map[int]int {
 				continue
 			}
 			epochs[block.block.index] = epoch
+			epochCnt.Incur(epoch, 1)
 			for _, refblock := range block.block.references {
 				visitList.PushBack(g.getDetailedBlock(refblock))
 			}
@@ -258,11 +260,11 @@ func (g *LocalGraph) getEpochs() map[int]int {
 		}
 	}
 
-	return epochs
+	return epochs, epochCnt
 }
 
 func (g *LocalGraph) countAnti(c int) (map[int]int, map[int]int) {
-	epochMap := g.getEpochs()
+	epochMap, _ := g.getEpochs()
 	numDesc := make(map[int]int)
 	result := make(map[int]int)
 	pivotWeight := make(map[int]int)
@@ -337,51 +339,63 @@ func (g *LocalGraph) countAnti(c int) (map[int]int, map[int]int) {
 
 	}
 
-	//For test only
-	//ii := 13
-	//if _, ok := result[ii]; ok {
-	//	log.Warningf("Block %d have %d + %d in %d, %d anti", ii, g.ledger[ii].block.ancestorNum, numDesc[ii], pivotWeight[epochMap[ii]+c], result[ii])
-	//}
 	return result, epochMap
 }
 
-func (g *LocalGraph) report() {
+func (g *LocalGraph) report_pivot() (CountMap, CountMap, CountMap) {
 	weight := g.totalWeight
 	pivot := g.pivotTip.block.height
-	attackPivot := 0
-	attackLastPivot := 0
+
+	pivotCnt := make(CountMap)
+	lastPivotCnt := make(CountMap)
+	pivotRefSum := make(CountMap)
 
 	pivotBlock := g.pivotTip
 	for !pivotBlock.isGenesis() {
-		if pivotBlock.block.minerID == 0 {
-			attackPivot = attackPivot + 1
-			if pivotBlock.block.height+1000 > g.pivotTip.block.height {
-				attackLastPivot = attackLastPivot + 1
-			}
+		pivotCnt.Incur(pivotBlock.block.minerID, 1)
+		pivotRefSum.Incur(pivotBlock.block.minerID, len(pivotBlock.block.references))
+		if pivotBlock.block.height+1000 > g.pivotTip.block.height {
+			lastPivotCnt.Incur(pivotBlock.block.minerID, 1)
 		}
 		pivotBlock = pivotBlock.parent
 	}
 
-	log.Warningf("%d(%d) pivot, %d attacker; ratio %.3f, %.3f;",
-		pivot, weight, attackPivot, float64(pivot)/float64(weight), float64(attackPivot)/float64(pivot))
+	// For log
+	miner0Pivot := pivotCnt[0]
+
+	log.Warningf("%d(%d) pivot, %d from miner 0; ratio %.3f, %.3f;",
+		pivot, weight, miner0Pivot, float64(pivot)/float64(weight), float64(miner0Pivot)/float64(pivot))
+
+	return pivotCnt, lastPivotCnt, pivotRefSum
 }
 
-func (g *LocalGraph) report2(c int) {
+func (g *LocalGraph) report_anti(c int) (CountMap, CountMap) {
 	anti, epoch := g.countAnti(c)
 	maxEpoch := g.pivotTip.block.height
 
-	ab, aa, hb, ha := 0, 0, 0, 0
+	blockCnt := make(CountMap)
+	antiSum := make(CountMap)
+
 	for index, num := range anti {
 		if epoch[index] < maxEpoch-100 {
-			continue
+
 		}
-		if g.ledger[index].block.minerID == 0 {
-			ab += 1
-			aa += num
-		} else {
-			hb += 1
-			ha += num
-		}
+		id := g.ledger[index].block.minerID
+		blockCnt.Incur(id, 1)
+		antiSum.Incur(id, num)
 	}
-	log.Warningf("N+%d Antiset in recent 100 epochs, Attacker %.3f, Honest %.3f", c, float64(aa)/float64(ab), float64(ha)/float64(hb))
+
+	if hasAttacker {
+		log.Warningf("N+%d Antiset in recent 100 epochs, Attacker %.3f, Honest %.3f", c,
+			float64(antiSum[0])/float64(blockCnt[0]),
+			float64(antiSum.Sum()-antiSum[0])/float64(blockCnt.Sum()-blockCnt[0]))
+	} else {
+		log.Warningf("N+%d Antiset in recent 100 epochs, Honest %.3f", c, float64(antiSum.Sum())/float64(blockCnt.Sum()))
+	}
+	return blockCnt, antiSum
+}
+
+func (g *LocalGraph) report_epochsize() CountMap {
+	_, size := g.getEpochs()
+	return size
 }
