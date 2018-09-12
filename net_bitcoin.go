@@ -6,17 +6,18 @@ import (
 )
 
 type BitcoinNetwork struct {
-	oracle *Oracle
+	oracle  *Oracle
+	traffic *Traffic
 
 	peers    map[int][]int
-	nextTime map[int]int64
+	nextTime map[int]int64 // Deprecate Code for FIFO model
 	inFlight map[int]*Set
 	sent     map[int]*Set
 	geo      map[int]int
 
 	attacker   *Set
-	bandwidth  float64
 	verifyTime float64
+	relayImpl  int
 }
 
 func NewBitcoinNetwork(attacker bool) *BitcoinNetwork {
@@ -25,12 +26,14 @@ func NewBitcoinNetwork(attacker bool) *BitcoinNetwork {
 		isAttacker.Add(0)
 	}
 
-	return &BitcoinNetwork{
-		bandwidth:  bandwidth_,
+	network := &BitcoinNetwork{
 		verifyTime: 0.01,
 
-		attacker: isAttacker,
+		attacker:  isAttacker,
+		relayImpl: 0,
 	}
+	network.traffic = NewTraffic(network)
+	return network
 }
 
 func (bn *BitcoinNetwork) Setup(o *Oracle) {
@@ -58,7 +61,7 @@ func (bn *BitcoinNetwork) Setup(o *Oracle) {
 		for _, p := range peer[i] {
 			set.Add(p)
 		}
-		for j := 0; j < peers_-len(peer[i]); j++ {
+		for j := 0; j < peers_/2; j++ {
 			for {
 				end := int(rand.Int31n(int32(N)))
 				if !set.Has(end) {
@@ -79,9 +82,7 @@ func (bn *BitcoinNetwork) Setup(o *Oracle) {
 		})
 		for _, p := range list {
 			peer[i] = append(peer[i], p)
-			if p > i {
-				peer[p] = append(peer[p], i)
-			}
+			peer[p] = append(peer[p], i)
 		}
 	}
 
@@ -98,6 +99,9 @@ func (bn *BitcoinNetwork) Broadcast(senderID int, block *Block) []Event {
 	bn.inFlight[senderID].Add(block.index)
 
 	attackerRelay := bn.expressRelay(block)
+	if _, ok := block.receivingTime[senderID]; !ok {
+		block.receivingTime[senderID] = bn.oracle.timestamp
+	}
 
 	return append(bn.sendToAllPeer(senderID, block), attackerRelay...)
 }
@@ -106,14 +110,62 @@ func (bn *BitcoinNetwork) Relay(senderID int, block *Block) []Event {
 	bn.sent[senderID].Add(block.index)
 	bn.inFlight[senderID].Add(block.index)
 
+	//For log and statistic
+	if _, ok := block.receivingTime[senderID]; !ok {
+		block.receivingTime[senderID] = bn.oracle.timestamp
+
+		n := len(bn.oracle.miners.miners)
+		if len(block.receivingTime) == n {
+			start := block.receivingTime[block.minerID]
+			var sum int64
+			sum = 0
+			for _, item := range block.receivingTime {
+				sum += item - start
+			}
+			avg := float64(sum) / float64(n)
+			max := float64(bn.oracle.timestamp - start)
+
+			if block.index%5 == 0 {
+				log.Warningf("Block %d, Avg time %0.2f, Max time %0.2f", block.index, avg/bn.oracle.timePrecision, max/bn.oracle.timePrecision)
+			} else {
+				log.Noticef("Block %d, Avg time %0.2f, Max time %0.2f", block.index, avg/bn.oracle.timePrecision, max/bn.oracle.timePrecision)
+			}
+
+		}
+	}
+
 	return bn.sendToAllPeer(senderID, block)
 }
 
+func (bn *BitcoinNetwork) sendToAllPeer(senderID int, block *Block) []Event {
+	results := make([]Event, 0)
+	startTime := int64(bn.oracle.timePrecision*bn.verifyTime) + bn.oracle.timestamp
+
+	for _, receiverID := range bn.peers[senderID] {
+		sendINV := &INVPacketEvent{
+			PacketEvent: PacketEvent{
+				senderID:   senderID,
+				receiverID: receiverID,
+				network:    bn,
+				size:       32 * bytes,
+			},
+			blockID: block.index,
+		}
+		sendINV.childPointer = sendINV
+		sendINV.prepare(startTime)
+		sendINV.status = sending
+		results = append(results, sendINV)
+	}
+
+	return results
+}
+
+// Interface for attacker network advantage
 func (bn *BitcoinNetwork) expressRelay(block *Block) []Event {
 	result := make([]Event, 0)
 	for _, attacker := range bn.attacker.List() {
 		sendEvent := &SendBlockEvent{
-			BaseEvent:  BaseEvent{bn.oracle.timestamp + 1},
+			BaseEvent:  BaseEvent{timestamp: bn.oracle.timestamp + 1},
 			receiverID: attacker,
 			block:      block,
 		}
@@ -132,7 +184,7 @@ func (bn *BitcoinNetwork) expressBroadcast(block *Block) []Event {
 			continue
 		}
 		sendEvent := &SendBlockEvent{
-			BaseEvent:  BaseEvent{bn.oracle.timestamp + 1},
+			BaseEvent:  BaseEvent{timestamp: bn.oracle.timestamp + 1},
 			receiverID: receiver,
 			block:      block,
 		}
@@ -143,95 +195,57 @@ func (bn *BitcoinNetwork) expressBroadcast(block *Block) []Event {
 	return result
 }
 
-func (bn *BitcoinNetwork) sendToAllPeer(senderID int, block *Block) []Event {
-	results := make([]Event, 0)
-	startTime := int64(bn.oracle.timePrecision*bn.verifyTime) + bn.oracle.timestamp
-
-	for _, receiverID := range bn.peers[senderID] {
-		sendINV := &INVPacketEvent{
-			PacketEvent: PacketEvent{
-				senderID:   senderID,
-				receiverID: receiverID,
-				network:    bn,
-				size:       32 * byte,
-			},
-			blockID: block.index,
-		}
-		sendINV.prepare(startTime)
-		results = append(results, sendINV)
-	}
-
-	return results
-}
-
-type PacketEvent struct {
-	BaseEvent
-	network    *BitcoinNetwork
-	senderID   int
-	receiverID int
-	size       int
-}
-
-const (
-	byte = 1
-	kb   = 1 << 10
-	mb   = 1 << 20
-)
-
-func (e *PacketEvent) getDelay() int64 {
-	network := e.network
-	oracle := network.oracle
-	realTime := float64(e.size) / (network.bandwidth * 128 * kb)
-	// TODO: Add random here
-	return int64(realTime * oracle.timePrecision)
-}
-
-func (e *PacketEvent) prepare(startTime int64) {
-	network := e.network
-	oracle := network.oracle
-	nextTime := network.nextTime[e.senderID]
-	if nextTime < startTime {
-		nextTime = startTime
-	}
-
-	sentTime := nextTime + e.getDelay()
-	loc1, loc2 := network.geo[e.senderID], network.geo[e.receiverID]
-	networkDelay := (geodelay[loc1][loc2] + 4*rand.Float64()) * (0.9 + 0.2*rand.Float64())
-	delayOffset := int64(networkDelay / 1000 * oracle.timePrecision)
-
-	network.nextTime[e.senderID] = sentTime
-	if e.senderID == 0 {
-		log.Debugf("Time %0.2f, miner 0 update finish Time to %0.2f", network.oracle.getRealTime(), float64(sentTime)/network.oracle.timePrecision)
-	}
-	e.timestamp = sentTime + delayOffset
-}
-
 type INVPacketEvent struct {
 	PacketEvent
 	blockID int
 }
 
-func (e *INVPacketEvent) Run(o *Oracle) []Event {
+func (e *INVPacketEvent) Sent(o *Oracle) []Event {
 	network := e.network
 	if network.inFlight[e.receiverID].Has(e.blockID) {
 		return []Event{}
 	}
 
-	getData := &GETPacketEvent{
-		PacketEvent: PacketEvent{
-			senderID:   e.receiverID,
-			receiverID: e.senderID,
-			network:    e.network,
-			size:       int(blockSize_ * mb),
-		},
-		block: o.blocks[e.blockID],
+	result := []Event{}
+	switch network.relayImpl {
+	case 0:
+		getData := &GETPacketEvent{
+			PacketEvent: PacketEvent{
+				senderID:   e.senderID,
+				receiverID: e.receiverID,
+				network:    e.network,
+				size:       int64(blockSize_ * mb),
+			},
+			block: o.blocks[e.blockID],
+		}
+		getData.childPointer = getData
+
+		if getData.senderID == 0 {
+			log.Noticef("Time %0.2f, Miner %d request %d", o.getRealTime(), e.receiverID, e.blockID)
+		}
+
+		getData.prepare(o.timestamp)
+		network.inFlight[e.receiverID].Add(e.blockID)
+		result = append(result, getData)
+	case 1:
+		getData := &GETCompactPacketEvent{
+			PacketEvent: PacketEvent{
+				senderID:   e.senderID,
+				receiverID: e.receiverID,
+				network:    e.network,
+				size:       int64(blockSize_ * mb / 50),
+			},
+			block: o.blocks[e.blockID],
+		}
+		getData.childPointer = getData
+
+		log.Noticef("Time %0.2f, Miner %d request %d", o.getRealTime(), e.receiverID, e.blockID)
+
+		getData.prepare(o.timestamp)
+		network.inFlight[e.receiverID].Add(e.blockID)
+		result = append(result, getData)
 	}
-
-	log.Debugf("Time %0.2f, Miner %d request %d", o.getRealTime(), e.receiverID, e.blockID)
-
-	getData.prepare(o.timestamp)
-	network.inFlight[e.receiverID].Add(e.blockID)
-	return []Event{getData}
+	return result
 }
 
 type GETPacketEvent struct {
@@ -239,11 +253,43 @@ type GETPacketEvent struct {
 	block *Block
 }
 
-func (e *GETPacketEvent) Run(o *Oracle) []Event {
+func (e *GETPacketEvent) Sent(o *Oracle) []Event {
 	receiveEvent := &SendBlockEvent{
-		BaseEvent:  BaseEvent{e.timestamp},
+		BaseEvent:  BaseEvent{timestamp: e.timestamp},
 		block:      e.block,
-		receiverID: e.senderID,
+		receiverID: e.receiverID,
+	}
+	if e.receiverID == 0 {
+		log.Debugf("Relay block %d", e.block.index)
+	}
+	if e.senderID == 0 {
+		log.Noticef("Time %0.2f, Miner %d get block %d", float64(o.timestamp)/timePrecision, e.receiverID, e.block.index)
+	}
+	return []Event{receiveEvent}
+}
+
+type GETCompactPacketEvent struct {
+	PacketEvent
+	block *Block
+}
+
+func (e *GETCompactPacketEvent) Sent(o *Oracle) []Event {
+	receiveEvent := &GETPacketEvent{
+		PacketEvent: PacketEvent{
+			senderID:   e.senderID,
+			receiverID: e.receiverID,
+			network:    e.network,
+			size:       int64(blockSize_ * mb),
+		},
+		block: e.block,
+	}
+	receiveEvent.childPointer = receiveEvent
+	receiveEvent.prepare(o.timestamp + e.pingDelay())
+	if e.receiverID == 0 {
+		log.Debugf("Relay block %d", e.block.index)
+	}
+	if e.senderID == 0 {
+		log.Debugf("Receive block %d", e.block.index)
 	}
 	return []Event{receiveEvent}
 }

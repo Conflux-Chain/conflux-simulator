@@ -29,6 +29,7 @@ func (e *GenBlockEvent) Run(o *Oracle) []Event {
 		}
 
 		time.Sleep(1 * time.Millisecond)
+		log.Warning("")
 	}
 	//time.Sleep(300 * time.Millisecond)
 	events := miner.GenerateBlock(e.block)

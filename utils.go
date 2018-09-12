@@ -10,24 +10,27 @@ func UNUSED(v interface{}) {
 	_ = v
 }
 
-type PriorityQueue []Event
+type EventPriorityQueue []Event
 
-func (pq PriorityQueue) Len() int { return len(pq) }
+func (pq EventPriorityQueue) Len() int { return len(pq) }
 
-func (pq PriorityQueue) Less(i, j int) bool {
+func (pq EventPriorityQueue) Less(i, j int) bool {
 	return pq[i].GetTimestamp() < pq[j].GetTimestamp()
 }
 
-func (pq PriorityQueue) Swap(i, j int) {
+func (pq EventPriorityQueue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
+	pq[i].SetIndex(i)
+	pq[j].SetIndex(j)
 }
 
-func (pq *PriorityQueue) Push(x interface{}) {
+func (pq *EventPriorityQueue) Push(x interface{}) {
 	item := x.(Event)
 	*pq = append(*pq, item)
+	item.SetIndex(len(*pq) - 1)
 }
 
-func (pq *PriorityQueue) Pop() interface{} {
+func (pq *EventPriorityQueue) Pop() interface{} {
 	old := *pq
 	n := len(old)
 	item := old[n-1]
@@ -35,16 +38,49 @@ func (pq *PriorityQueue) Pop() interface{} {
 	return item
 }
 
+type PacketEventPriorityQueue []*PacketEvent
+
+func (pq PacketEventPriorityQueue) Len() int { return len(pq) }
+
+func (pq PacketEventPriorityQueue) Less(i, j int) bool {
+	return pq[i].accSize < pq[j].accSize
+}
+
+func (pq PacketEventPriorityQueue) Swap(i, j int) {
+	pq[i], pq[j] = pq[j], pq[i]
+}
+
+func (pq *PacketEventPriorityQueue) Push(x interface{}) {
+	item := x.(*PacketEvent)
+	*pq = append(*pq, item)
+}
+
+func (pq *PacketEventPriorityQueue) Pop() interface{} {
+	old := *pq
+	n := len(old)
+	item := old[n-1]
+	*pq = old[0: n-1]
+	return item
+}
+
+func (pq *PacketEventPriorityQueue) Peek() *PacketEvent {
+	old := *pq
+	return old[0]
+}
+
 type EventQueue struct {
-	queueList *PriorityQueue
+	queueList *EventPriorityQueue
 }
 
 func (eq EventQueue) Push(x Event) {
 	heap.Push(eq.queueList, x)
+	x.SetQueue(&eq)
 }
 
 func (eq EventQueue) Pop() Event {
-	return heap.Pop(eq.queueList).(Event)
+	x := heap.Pop(eq.queueList).(Event)
+	x.SetQueue(nil)
+	return x
 }
 
 func loadLogger(level logging.Level) {

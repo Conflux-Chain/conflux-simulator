@@ -104,7 +104,7 @@ func (pn *PeerNetwork) Broadcast(id int, block *Block) []Event {
 	}
 	result2 := pn.expressRelay(block)
 	eventSent := &PeerSendEvent{
-		BaseEvent: BaseEvent{pn.oracle.timestamp},
+		BaseEvent: BaseEvent{timestamp: pn.oracle.timestamp},
 		senderID:  id,
 		block:     block,
 		network:   pn,
@@ -117,7 +117,7 @@ func (pn *PeerNetwork) Broadcast(id int, block *Block) []Event {
 
 func (pn *PeerNetwork) Relay(id int, block *Block) []Event {
 	sendToPeer := &PeerSendEvent{
-		BaseEvent: BaseEvent{pn.oracle.timestamp},
+		BaseEvent: BaseEvent{timestamp: pn.oracle.timestamp},
 		senderID:  id,
 		block:     block,
 		network:   pn,
@@ -188,7 +188,7 @@ func (pn *PeerNetwork) sendBlockToBestPeer(e *PeerSendEvent) []Event {
 			nextTime = currentTS + 0.1
 		}
 		checkEvent := &PeerSendEvent{
-			BaseEvent: BaseEvent{pn.toTimestamp(nextTime)},
+			BaseEvent: BaseEvent{timestamp: pn.toTimestamp(nextTime)},
 			senderID:  sender,
 			block:     block,
 			network:   pn,
@@ -210,7 +210,7 @@ func (pn *PeerNetwork) expressRelay(block *Block) []Event {
 	result := make([]Event, 0)
 	for _, attacker := range pn.attacker.List() {
 		sendEvent := &SendBlockEvent{
-			BaseEvent:  BaseEvent{pn.oracle.timestamp + pn.toTimestamp(pn.attackerIn)},
+			BaseEvent:  BaseEvent{timestamp: pn.oracle.timestamp + pn.toTimestamp(pn.attackerIn)},
 			receiverID: attacker,
 			block:      block,
 		}
@@ -231,7 +231,7 @@ func (pn *PeerNetwork) expressBroadcast(block *Block) []Event {
 			continue
 		}
 		sendEvent := &SendBlockEvent{
-			BaseEvent:  BaseEvent{pn.oracle.timestamp + pn.toTimestamp(pn.attackerOut)},
+			BaseEvent:  BaseEvent{timestamp: pn.oracle.timestamp + pn.toTimestamp(pn.attackerOut)},
 			receiverID: receiver,
 			block:      block,
 		}

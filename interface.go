@@ -1,5 +1,7 @@
 package main
 
+import "container/heap"
+
 type Miner interface {
 	Setup(*Oracle, int)
 	ReceiveBlock(*Block) ([]Event)
@@ -15,12 +17,46 @@ type Network interface {
 type Event interface {
 	GetTimestamp() int64
 	Run(o *Oracle) []Event
+	SetIndex(int)
+	GetIndex() int
+	SetQueue(*EventQueue)
+}
+
+type PacketSent interface {
+	Sent(o *Oracle) []Event
 }
 
 type BaseEvent struct {
 	timestamp int64
+	index     int
+	eq        *EventQueue
 }
 
 func (e *BaseEvent) GetTimestamp() int64 {
 	return e.timestamp
+}
+
+func (e *BaseEvent) SetIndex(id int) {
+	e.index = id
+}
+
+func (e *BaseEvent) GetIndex() int {
+	return e.index
+}
+
+func (e *BaseEvent) SetQueue(eq *EventQueue) {
+	e.eq = eq
+}
+
+func (e *BaseEvent) GetQueue() *EventQueue {
+	return e.eq
+}
+
+func (e *BaseEvent) ChangeTime(timestamp int64) {
+	e.timestamp = timestamp
+	if e.eq == nil {
+		return
+	} else {
+		heap.Fix(e.eq.queueList, e.index)
+	}
 }

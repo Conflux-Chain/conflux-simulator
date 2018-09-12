@@ -27,7 +27,7 @@ func (sn *SimpleNetwork) Setup(oracle *Oracle) {
 
 func (sn *SimpleNetwork) Broadcast(senderID int, block *Block) []Event {
 	broadcastEvent := &BroadcastEvent{
-		BaseEvent: BaseEvent{sn.oracle.timestamp},
+		BaseEvent: BaseEvent{timestamp:sn.oracle.timestamp},
 		senderID:  senderID,
 		block:     block,
 		network:   sn,
@@ -68,7 +68,7 @@ func (e *BroadcastEvent) Run(o *Oracle) ([]Event) {
 		if receiverID != e.block.minerID {
 			sendTime := o.timestamp + int64(e.network.getDelay(e.senderID, receiverID, e.block)*o.timePrecision)
 			sendEvent := &SendBlockEvent{
-				BaseEvent:  BaseEvent{sendTime},
+				BaseEvent:  BaseEvent{timestamp:sendTime},
 				block:      e.block,
 				receiverID: receiverID,
 			}

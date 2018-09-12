@@ -105,7 +105,7 @@ func (wm *WithholdMiner) graphInsert(block *Block) []Event {
 			return []Event{}
 		} else {
 			delayEvent := &DelayInsertEvent{
-				BaseEvent: BaseEvent{wm.oracle.timestamp + diameter/2},
+				BaseEvent: BaseEvent{timestamp:wm.oracle.timestamp + diameter/2},
 				block:     block,
 				m:         wm,
 			}

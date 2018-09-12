@@ -23,6 +23,9 @@ type Block struct {
 	// Maintained by miner of child block
 	children    []*Block
 	refChildren []*Block
+
+	// Maintained by Receiver
+	receivingTime map[int]int64
 }
 
 type MinerSet struct {
@@ -58,13 +61,13 @@ type Oracle struct {
 }
 
 func NewOracle(timePrecision float64, rate float64, duration float64) *Oracle {
-	emptyQueue := make(PriorityQueue, 0)
+	emptyQueue := make(EventPriorityQueue, 0)
 	queue := &EventQueue{queueList: &emptyQueue}
 	heap.Init(queue.queueList)
 
 	miners := &MinerSet{miners: []Miner{}, weights: []float64{}}
 
-	genesis := &Block{index: 0, minerID: -1, residual: 0, seen: make(map[int]bool), height: 0, ancestorNum: 0}
+	genesis := &Block{index: 0, minerID: -1, residual: 0, seen: make(map[int]bool), height: 0, ancestorNum: 0, receivingTime: make(map[int]int64)}
 	blocks := []*Block{genesis}
 
 	return &Oracle{
@@ -86,7 +89,7 @@ func (o *Oracle) prepare() {
 	o.queue.Push(newBlockEvent)
 
 	broadcastGenesisEvent := &BroadcastEvent{
-		BaseEvent: BaseEvent{0},
+		BaseEvent: BaseEvent{timestamp: 0},
 		block:     o.blocks[0],
 	}
 	o.queue.Push(broadcastGenesisEvent)
@@ -165,10 +168,11 @@ func (o *Oracle) mineNextBlock() Event {
 	pickedID := sort.SearchFloat64s(o.miners.cumTable, rand.Float64())
 
 	block := &Block{
-		index:    len(o.blocks),
-		minerID:  pickedID,
-		residual: residual,
-		seen:     make(map[int]bool),
+		index:         len(o.blocks),
+		minerID:       pickedID,
+		residual:      residual,
+		seen:          make(map[int]bool),
+		receivingTime: make(map[int]int64),
 	}
 	for id := range o.miners.miners {
 		block.seen[id] = false
@@ -176,7 +180,7 @@ func (o *Oracle) mineNextBlock() Event {
 	o.blocks = append(o.blocks, block)
 
 	newBlockEvent := &GenBlockEvent{
-		BaseEvent: BaseEvent{nextStamp},
+		BaseEvent: BaseEvent{timestamp: nextStamp},
 		block:     block,
 	}
 	return newBlockEvent

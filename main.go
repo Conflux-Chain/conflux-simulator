@@ -18,14 +18,15 @@ var (
 const (
 	honestMiners  = 10000
 	timePrecision = 1e6
-	networkType_   = BitcoinNet
+	networkType_  = BitcoinNet
 )
 
 var (
-	rate_      = 5.0 // 5s
-	blockSize_ = 4.0 // 1MB
-	bandwidth_ = 7.5 //20 Mbps
-	duration_  = 600 * rate_
+	rate_       = 5.0  // 5s
+	blockSize_  = 4.0  // 4MB
+	bufferSize_ = 16.0 // 16MB socket buffet
+	bandwidth_  = 20.0 //20 Mbps
+	duration_   = 600 * rate_
 
 	localRatio_ = 0.1 //Parameters for Bitcoin Network
 	peers_      = 10
@@ -92,22 +93,23 @@ func run() *Oracle {
 }
 
 func flagParse() {
-	flag.BoolVar(&debug_, "d", false, "debug")
-	flag.BoolVar(&hasAttacker_, "a", false, "attacker")
-	flag.IntVar(&logLevel_, "log", 3, "Log Level")
+	flag.BoolVar(&debug_, "d", false, "Set debug")
+	flag.IntVar(&logLevel_, "log", 2, "Log Level (1E,2W,3N,4I,5D)")
+
+	flag.Float64Var(&rate_, "r", 5, "Block Generation Rate (s/block)")
+	flag.Float64Var(&blockSize_, "s", 4, "Block Size (MB)")
+	flag.Float64Var(&bandwidth_, "band", 20, "Bandwidth(Mbps)")
+	flag.Float64Var(&bufferSize_, "buff", 16, "Buffer Size (MB)")
+
+	flag.BoolVar(&hasAttacker_, "a", false, "Attacker")
 	flag.Float64Var(&attacker_, "l", 0.2, "Attacker ratio")
-	flag.Float64Var(&localRatio_, "local", 0.2, "Local ratio")
+
+	flag.Float64Var(&localRatio_, "local", 0.01, "Local ratio")
 	flag.IntVar(&peers_, "peer", 10, "Number of peers")
 
-	flag.Float64Var(&rate_, "r", 5, "Block Generation Rate")
-	flag.Float64Var(&blockSize_, "s", 4, "Block Size")
-	flag.Float64Var(&bandwidth_, "band", 7.5, "Bandwidth(Mbps)")
-
-	//nettype := flag.Int("net", 3, "Network type")
 	durblocks := flag.Float64("t", 600, "Duration (in blocks)")
 	flag.Parse()
 
-	//networkType_ = NetworkType(*nettype)
 	duration_ = *durblocks * rate_
 	if !hasAttacker_ {
 		attacker_ = 0
@@ -119,11 +121,11 @@ func main() {
 
 	log.Warningf("[Running parameters]")
 	log.Warningf("Basic: rate %0.1f, size %0.0f MB, attacker %0.0f%%", rate_, blockSize_, attacker_)
-	log.Warningf("Network: bandwidth %0.1f Mbps, %d peers, %d neighbors, local ratio %0.2f", bandwidth_, honestMiners, peers_, localRatio_)
+	log.Warningf("Network: bandwidth %0.1f Mbps, %0.1f buffer, %d peers, %d neighbors, local ratio %0.2f", bandwidth_, bufferSize_, honestMiners, peers_, localRatio_)
 
 	var seed int64
 	if debug_ {
-		seed = int64(249020116)
+		seed = int64(499226315)
 	} else {
 		seed = int64(time.Now().Nanosecond())
 	}
