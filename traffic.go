@@ -23,12 +23,11 @@ func NewTraffic(network *BitcoinNetwork) *Traffic {
 		nodes:      make(map[int]*NodeOutbound),
 		bufferSize: int64(bufferSize_*mb) + 1,
 	}
-	for _, id := range network.attacker.List() {
-		result.nodes[id] = result.NewNodeOutbound(0)
-		result.nodes[id].bandwidth = 500.0 * 128 * kb
-		result.nodes[id].bufferSize = 32 * mb
+	if hasMonopoly_ {
+		result.nodes[0] = result.NewNodeOutbound(0)
+		result.nodes[0].bandwidth = 500.0 * 128 * kb
+		result.nodes[0].bufferSize = 32 * mb
 	}
-
 	return result
 }
 
@@ -98,10 +97,9 @@ func (t *Traffic) pushEvent(e *PacketEvent) []Event {
 
 	if sender.queue.Len() > 0 {
 		sender.accSize += int64(float64(currentTime-sender.lastWakeupT) * sender.bandwidth / (oracle.timePrecision * float64(sender.queue.Len())))
-		sender.lastWakeupT = currentTime
-	} else {
-		sender.lastWakeupT = currentTime
 	}
+
+	sender.lastWakeupT = currentTime
 
 	e.accSize = sender.accSize + e.size
 	sender.buffer += e.size
@@ -221,7 +219,7 @@ type PacketEvent struct {
 
 	accSize      int64
 	status       PacketStatus
-	childPointer PacketSent //This is a stupid fix. I don't know that golang doesn't have inheritance when I write this code.
+	childPointer PacketSent  //This is a stupid fix. I don't know that golang doesn't have inheritance when I write this code.
 }
 
 const (
@@ -258,7 +256,7 @@ func (e *PacketEvent) Run(o *Oracle) []Event {
 }
 
 func (e *PacketEvent) Sent(o *Oracle) []Event {
-	log.Fatal("Not run children implementation")
+	log.Panic("Not run children implementation")
 	return []Event{}
 }
 

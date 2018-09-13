@@ -382,7 +382,7 @@ func (g *LocalGraph) report_anti(c int) (CountMap, CountMap) {
 		antiSum.Incur(id, num)
 	}
 
-	if hasAttacker_ {
+	if hasAttacker_ || hasMonopoly_{
 		log.Warningf("N+%d Antiset in recent 100 epochs, Attacker %.3f, Honest %.3f", c,
 			float64(antiSum[0])/float64(blockCnt[0]),
 			float64(antiSum.Sum()-antiSum[0])/float64(blockCnt.Sum()-blockCnt[0]))

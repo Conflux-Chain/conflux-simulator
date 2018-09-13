@@ -110,7 +110,7 @@ func (bn *BitcoinNetwork) Relay(senderID int, block *Block) []Event {
 	bn.sent[senderID].Add(block.index)
 	bn.inFlight[senderID].Add(block.index)
 
-	//For log and statistic
+	//For log and statistic, Network delay
 	if _, ok := block.receivingTime[senderID]; !ok {
 		block.receivingTime[senderID] = bn.oracle.timestamp
 
@@ -130,7 +130,6 @@ func (bn *BitcoinNetwork) Relay(senderID int, block *Block) []Event {
 			} else {
 				log.Noticef("Block %d, Avg time %0.2f, Max time %0.2f", block.index, avg/bn.oracle.timePrecision, max/bn.oracle.timePrecision)
 			}
-
 		}
 	}
 

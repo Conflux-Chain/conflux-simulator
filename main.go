@@ -3,7 +3,6 @@ package main
 import (
 	"./go-logging"
 	"flag"
-	"math"
 	"math/rand"
 	"time"
 )
@@ -12,6 +11,7 @@ var (
 	logLevel_    int
 	debug_       bool
 	hasAttacker_ bool
+	hasMonopoly_ bool
 	attacker_    float64
 )
 
@@ -48,7 +48,7 @@ const (
 type NetworkType int
 
 const (
-	SimpleNet NetworkType = iota + 1
+	SimpleNet  NetworkType = iota + 1
 	PeerNet
 	BitcoinNet
 )
@@ -71,14 +71,14 @@ func run() *Oracle {
 	oracle := NewOracle(timePrecision, rate_, duration_)
 	network := getNetwork(networkType_, hasAttacker_)
 
-	if hasAttacker_ {
+	if hasAttacker_ || hasMonopoly_ {
 		attacker := NewHonestMiner()
 		//attacker := NewWithholdMiner(delayRef)
 		oracle.addMiner(attacker, attacker_/(1-attacker_))
 	}
 
-	ratio := 0.8
-	_ = (1 - math.Pow(ratio, float64(honestMiners))) / (1 - ratio)
+	//ratio := 0.8
+	//_ = (1 - math.Pow(ratio, float64(honestMiners))) / (1 - ratio)
 	for i := 0; i < honestMiners; i++ {
 		oracle.addHonestMiner(1.0 / honestMiners)
 		//oracle.addHonestMiner(math.Pow(ratio, float64(i)) / sum)
@@ -102,6 +102,7 @@ func flagParse() {
 	flag.Float64Var(&bufferSize_, "buff", 32, "Buffer Size (MB)")
 
 	flag.BoolVar(&hasAttacker_, "a", false, "Attacker")
+	flag.BoolVar(&hasMonopoly_, "m", false, "Special Honest Miner")
 	flag.Float64Var(&attacker_, "l", 0.2, "Attacker ratio")
 
 	flag.Float64Var(&localRatio_, "local", 0.01, "Local ratio")
@@ -111,7 +112,7 @@ func flagParse() {
 	flag.Parse()
 
 	duration_ = *durblocks * rate_
-	if !hasAttacker_ {
+	if !hasAttacker_ && !hasMonopoly_ {
 		attacker_ = 0
 	}
 }
@@ -120,7 +121,11 @@ func main() {
 	loadLogger(logging.Level(logLevel_))
 
 	log.Warningf("[Running parameters]")
-	log.Warningf("Basic: rate %0.1f, size %0.0f MB, attacker %0.0f%%", rate_, blockSize_, attacker_)
+	if !hasAttacker_ && hasMonopoly_ {
+		log.Warningf("Basic: rate %0.1f, size %0.0f MB, special honest miner %0.0f%%", rate_, blockSize_, attacker_)
+	} else {
+		log.Warningf("Basic: rate %0.1f, size %0.0f MB, attacker %0.0f%%", rate_, blockSize_, attacker_)
+	}
 	log.Warningf("Network: bandwidth %0.1f Mbps, %0.1f buffer, %d peers, %d neighbors, local ratio %0.2f", bandwidth_, bufferSize_, honestMiners, peers_, localRatio_)
 
 	var seed int64
