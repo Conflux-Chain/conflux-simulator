@@ -1,11 +1,10 @@
 package main
 
 import (
-	"math/rand"
 	"container/heap"
-	"math"
 	"container/list"
-	"runtime/debug"
+	"math"
+	"math/rand"
 )
 
 const logID = 7429
@@ -18,12 +17,19 @@ type Traffic struct {
 }
 
 func NewTraffic(network *BitcoinNetwork) *Traffic {
-	return &Traffic{
+	result := &Traffic{
 		network:    network,
-		bandwidth:  bandwidth_,
+		bandwidth:  bandwidth_ * 128 * kb,
 		nodes:      make(map[int]*NodeOutbound),
 		bufferSize: int64(bufferSize_*mb) + 1,
 	}
+	for _, id := range network.attacker.List() {
+		result.nodes[id] = result.NewNodeOutbound(0)
+		result.nodes[id].bandwidth = 500.0 * 128 * kb
+		result.nodes[id].bufferSize = 32 * mb
+	}
+
+	return result
 }
 
 type NodeOutbound struct {
@@ -33,9 +39,11 @@ type NodeOutbound struct {
 	queue       *PacketEventPriorityQueue
 	waiting     *list.List
 	buffer      int64
+	bufferSize  int64
+	bandwidth   float64
 }
 
-func NewNodeOutbound(currentTime int64) *NodeOutbound {
+func (t *Traffic) NewNodeOutbound(currentTime int64) *NodeOutbound {
 	queue := make(PacketEventPriorityQueue, 0)
 	return &NodeOutbound{
 		accSize:     0,
@@ -43,6 +51,8 @@ func NewNodeOutbound(currentTime int64) *NodeOutbound {
 		queue:       &queue,
 		nextWakeupE: nil,
 		waiting:     list.New(),
+		bufferSize:  t.bufferSize,
+		bandwidth:   t.bandwidth,
 	}
 }
 
@@ -50,11 +60,11 @@ func (t *Traffic) addEvent(e *PacketEvent) []Event {
 	currentTime := t.network.oracle.timestamp
 
 	if _, ok := t.nodes[e.senderID]; !ok {
-		t.nodes[e.senderID] = NewNodeOutbound(currentTime)
+		t.nodes[e.senderID] = t.NewNodeOutbound(currentTime)
 	}
 	sender := t.nodes[e.senderID]
 
-	if sender.buffer+e.size < t.bufferSize {
+	if sender.buffer+e.size < sender.bufferSize {
 		return t.pushEvent(e)
 	} else {
 		sender.waiting.PushBack(e)
@@ -68,7 +78,7 @@ func (t *Traffic) pullWaitingListAndUpdate(sender *NodeOutbound) []Event {
 	}
 	front := sender.waiting.Front()
 	e := front.Value.(*PacketEvent)
-	if sender.buffer+e.size < t.bufferSize {
+	if sender.buffer+e.size < sender.bufferSize {
 		sender.waiting.Remove(front)
 		return t.pushEvent(e)
 	} else {
@@ -81,13 +91,13 @@ func (t *Traffic) pushEvent(e *PacketEvent) []Event {
 	currentTime := t.network.oracle.timestamp
 
 	if _, ok := t.nodes[e.senderID]; !ok {
-		t.nodes[e.senderID] = NewNodeOutbound(currentTime)
+		t.nodes[e.senderID] = t.NewNodeOutbound(currentTime)
 	}
 
 	sender := t.nodes[e.senderID]
 
 	if sender.queue.Len() > 0 {
-		sender.accSize += int64(float64(currentTime-sender.lastWakeupT) * t.bandwidth * 128 * kb / (oracle.timePrecision * float64(sender.queue.Len())))
+		sender.accSize += int64(float64(currentTime-sender.lastWakeupT) * sender.bandwidth / (oracle.timePrecision * float64(sender.queue.Len())))
 		sender.lastWakeupT = currentTime
 	} else {
 		sender.lastWakeupT = currentTime
@@ -111,7 +121,7 @@ func (t *Traffic) popEvent(e *WakeupTrafficEvent) (*PacketEvent, []Event) {
 		log.Fatal("Sequence Empty")
 	}
 
-	sender.accSize += int64(float64(currentTime-sender.lastWakeupT) * t.bandwidth * 128 * kb / (oracle.timePrecision * float64(sender.queue.Len())))
+	sender.accSize += int64(float64(currentTime-sender.lastWakeupT) * sender.bandwidth / (oracle.timePrecision * float64(sender.queue.Len())))
 	sender.lastWakeupT = currentTime
 
 	relayEvent := heap.Pop(e.sender.queue).(*PacketEvent)
@@ -134,7 +144,7 @@ func (t *Traffic) updateNextWakeup(sender *NodeOutbound) []Event {
 		return []Event{}
 	}
 
-	nextWakeup := currentTime + int64(float64(sender.queue.Peek().accSize-sender.accSize)*oracle.timePrecision*float64(sender.queue.Len())/float64(t.bandwidth*128*kb))
+	nextWakeup := currentTime + int64(float64(sender.queue.Peek().accSize-sender.accSize)*oracle.timePrecision*float64(sender.queue.Len())/sender.bandwidth)
 	if nextWakeup < currentTime {
 		nextWakeup = currentTime
 	}
@@ -147,8 +157,7 @@ func (t *Traffic) updateNextWakeup(sender *NodeOutbound) []Event {
 		sender.nextWakeupE = nextWakeupE
 
 		if sender.lastWakeupT != currentTime {
-			debug.PrintStack()
-			log.Fatal(sender.lastWakeupT, currentTime, "Forget update lastWakeupT")
+			log.Panic(sender.lastWakeupT, currentTime, "Forget update lastWakeupT")
 		}
 
 		if content, ok := t.nodes[logID]; ok && content == sender {
@@ -284,6 +293,6 @@ func (e *PacketEvent) Sent(o *Oracle) []Event {
 //	network := e.network
 //	oracle := network.oracle
 //	traffic := network.traffic
-//	realTime := float64(e.size) / (traffic.bandwidth * 128 * kb)
+//	realTime := float64(e.size) / (traffic.bandwidth)
 //	return int64(realTime * oracle.timePrecision)
 //}

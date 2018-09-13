@@ -2,10 +2,10 @@ package main
 
 import (
 	"./go-logging"
+	"flag"
+	"math"
 	"math/rand"
 	"time"
-	"math"
-	"flag"
 )
 
 var (
@@ -48,7 +48,7 @@ const (
 type NetworkType int
 
 const (
-	SimpleNet  NetworkType = iota + 1
+	SimpleNet NetworkType = iota + 1
 	PeerNet
 	BitcoinNet
 )
@@ -99,7 +99,7 @@ func flagParse() {
 	flag.Float64Var(&rate_, "r", 5, "Block Generation Rate (s/block)")
 	flag.Float64Var(&blockSize_, "s", 4, "Block Size (MB)")
 	flag.Float64Var(&bandwidth_, "band", 20, "Bandwidth(Mbps)")
-	flag.Float64Var(&bufferSize_, "buff", 16, "Buffer Size (MB)")
+	flag.Float64Var(&bufferSize_, "buff", 32, "Buffer Size (MB)")
 
 	flag.BoolVar(&hasAttacker_, "a", false, "Attacker")
 	flag.Float64Var(&attacker_, "l", 0.2, "Attacker ratio")
@@ -107,7 +107,7 @@ func flagParse() {
 	flag.Float64Var(&localRatio_, "local", 0.01, "Local ratio")
 	flag.IntVar(&peers_, "peer", 10, "Number of peers")
 
-	durblocks := flag.Float64("t", 600, "Duration (in blocks)")
+	durblocks := flag.Float64("t", 6000, "Duration (in blocks)")
 	flag.Parse()
 
 	duration_ = *durblocks * rate_
