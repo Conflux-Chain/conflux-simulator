@@ -27,7 +27,7 @@ func NewBitcoinNetwork(attacker bool) *BitcoinNetwork {
 	}
 
 	network := &BitcoinNetwork{
-		verifyTime: 0.01,
+		verifyTime: 0.3,
 
 		attacker:  isAttacker,
 		relayImpl: 0,
@@ -165,8 +165,6 @@ func (bn *BitcoinNetwork) sendToAllPeer(senderID int, block *Block) []Event {
 		}
 		sendINV.childPointer = sendINV
 		sendINV.prepare(startTime)
-		// TODO: add ping delay
-
 		sendINV.status = sending
 		results = append(results, sendINV)
 	}
@@ -242,7 +240,7 @@ func (e *INVPacketEvent) Sent(o *Oracle) []Event {
 			log.Infof("Time %0.2f, Miner %d request %d", o.getRealTime(), e.receiverID, e.blockID)
 		}
 
-		getData.prepare(o.timestamp)
+		getData.prepare(o.timestamp + 2*e.pingDelay())
 		network.inFlight[e.receiverID].Add(e.blockID)
 		result = append(result, getData)
 	case 1:
@@ -259,7 +257,7 @@ func (e *INVPacketEvent) Sent(o *Oracle) []Event {
 
 		log.Noticef("Time %0.2f, Miner %d request %d", o.getRealTime(), e.receiverID, e.blockID)
 
-		getData.prepare(o.timestamp)
+		getData.prepare(o.timestamp + 2*e.pingDelay())
 		network.inFlight[e.receiverID].Add(e.blockID)
 		result = append(result, getData)
 	}
@@ -273,7 +271,7 @@ type GETPacketEvent struct {
 
 func (e *GETPacketEvent) Sent(o *Oracle) []Event {
 	receiveEvent := &SendBlockEvent{
-		BaseEvent:  BaseEvent{timestamp: e.timestamp},
+		BaseEvent:  BaseEvent{timestamp: e.timestamp + e.pingDelay()},
 		block:      e.block,
 		receiverID: e.receiverID,
 	}
@@ -302,7 +300,7 @@ func (e *GETCompactPacketEvent) Sent(o *Oracle) []Event {
 		block: e.block,
 	}
 	receiveEvent.childPointer = receiveEvent
-	receiveEvent.prepare(o.timestamp + e.pingDelay())
+	receiveEvent.prepare(o.timestamp + 2*e.pingDelay())
 	if e.receiverID == 0 {
 		log.Debugf("Relay block %d", e.block.index)
 	}

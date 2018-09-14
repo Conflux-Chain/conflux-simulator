@@ -108,7 +108,7 @@ func flagParse() {
 	flag.Float64Var(&localRatio_, "local", 0.05, "Local ratio")
 	flag.IntVar(&peers_, "peer", 10, "Number of peers")
 
-	durblocks := flag.Float64("t", 6000, "Duration (in blocks)")
+	durblocks := flag.Float64("t", 5000, "Duration (in blocks)")
 	flag.Parse()
 
 	duration_ = *durblocks * rate_
@@ -124,7 +124,7 @@ func main() {
 	if !hasAttacker_ && hasMonopoly_ {
 		log.Warningf("Basic: rate %0.1f, size %0.0f MB, special honest miner %0.0f%%", rate_, blockSize_, attacker_*100)
 	} else {
-		log.Warningf("Basic: rate %0.1f, size %0.0f MB, attacker %0.0f%%", rate_, blockSize_, attacker_)
+		log.Warningf("Basic: rate %0.1f, size %0.0f MB, attacker %0.0f%%", rate_, blockSize_, attacker_*100)
 	}
 	log.Warningf("Network: bandwidth %0.1f Mbps, %0.1f buffer, %d peers, %d neighbors, local ratio %0.2f", bandwidth_, bufferSize_, honestMiners, peers_, localRatio_)
 

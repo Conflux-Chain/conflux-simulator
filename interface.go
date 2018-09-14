@@ -23,7 +23,7 @@ type Event interface {
 }
 
 type PacketSent interface {
-	Sent(o *Oracle) []Event
+	Sent(o *Oracle) []Event //Called when the send have sent all the information
 }
 
 type BaseEvent struct {
