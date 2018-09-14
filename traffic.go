@@ -250,6 +250,7 @@ func (e *PacketEvent) Run(o *Oracle) []Event {
 		result = append(result, effects...)
 	case sending:
 		effects := e.childPointer.Sent(o)
+		//TODO: add ping delay
 		result = append(result, effects...)
 	}
 	return result

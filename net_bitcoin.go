@@ -1,8 +1,8 @@
 package main
 
 import (
-	"sort"
 	"math/rand"
+	"sort"
 )
 
 type BitcoinNetwork struct {
@@ -92,13 +92,22 @@ func (bn *BitcoinNetwork) Setup(o *Oracle) {
 	bn.inFlight = inFlight
 	bn.nextTime = nextTime
 	bn.geo = geo
+
+	if len(bn.attacker.List()) > 1 {
+		log.Fatal("Too much attackers")
+	}
 }
 
 func (bn *BitcoinNetwork) Broadcast(senderID int, block *Block) []Event {
 	bn.sent[senderID].Add(block.index)
 	bn.inFlight[senderID].Add(block.index)
 
-	attackerRelay := bn.expressRelay(block)
+	var attackerRelay []Event
+	if bn.attacker.Has(block.minerID) {
+		attackerRelay = bn.expressBroadcast(block)
+	} else {
+		attackerRelay = bn.expressRelay(block)
+	}
 	if _, ok := block.receivingTime[senderID]; !ok {
 		block.receivingTime[senderID] = bn.oracle.timestamp
 	}
@@ -126,9 +135,9 @@ func (bn *BitcoinNetwork) Relay(senderID int, block *Block) []Event {
 			max := float64(bn.oracle.timestamp - start)
 
 			if block.index%5 == 0 {
-				log.Warningf("Block %d, Avg time %0.2f, Max time %0.2f", block.index, avg/bn.oracle.timePrecision, max/bn.oracle.timePrecision)
+				log.Warningf("Block %d miner %d, Avg time %0.2f, Max time %0.2f", block.index, block.minerID, avg/bn.oracle.timePrecision, max/bn.oracle.timePrecision)
 			} else {
-				log.Noticef("Block %d, Avg time %0.2f, Max time %0.2f", block.index, avg/bn.oracle.timePrecision, max/bn.oracle.timePrecision)
+				log.Noticef("Block %d miner %d, Avg time %0.2f, Max time %0.2f", block.index, block.minerID, avg/bn.oracle.timePrecision, max/bn.oracle.timePrecision)
 			}
 		}
 	}
@@ -137,6 +146,10 @@ func (bn *BitcoinNetwork) Relay(senderID int, block *Block) []Event {
 }
 
 func (bn *BitcoinNetwork) sendToAllPeer(senderID int, block *Block) []Event {
+	if bn.attacker.Has(senderID) {
+		return []Event{}
+	}
+
 	results := make([]Event, 0)
 	startTime := int64(bn.oracle.timePrecision*bn.verifyTime) + bn.oracle.timestamp
 
@@ -152,6 +165,8 @@ func (bn *BitcoinNetwork) sendToAllPeer(senderID int, block *Block) []Event {
 		}
 		sendINV.childPointer = sendINV
 		sendINV.prepare(startTime)
+		// TODO: add ping delay
+
 		sendINV.status = sending
 		results = append(results, sendINV)
 	}
@@ -205,6 +220,10 @@ func (e *INVPacketEvent) Sent(o *Oracle) []Event {
 		return []Event{}
 	}
 
+	if o.blocks[e.blockID].minerID == 0 && hasAttacker_ {
+		log.Criticalf("error %d at %d", e.blockID, e.receiverID)
+	}
+
 	result := []Event{}
 	switch network.relayImpl {
 	case 0:
@@ -220,7 +239,7 @@ func (e *INVPacketEvent) Sent(o *Oracle) []Event {
 		getData.childPointer = getData
 
 		if getData.senderID == 0 {
-			log.Noticef("Time %0.2f, Miner %d request %d", o.getRealTime(), e.receiverID, e.blockID)
+			log.Infof("Time %0.2f, Miner %d request %d", o.getRealTime(), e.receiverID, e.blockID)
 		}
 
 		getData.prepare(o.timestamp)
@@ -262,7 +281,7 @@ func (e *GETPacketEvent) Sent(o *Oracle) []Event {
 		log.Debugf("Relay block %d", e.block.index)
 	}
 	if e.senderID == 0 {
-		log.Noticef("Time %0.2f, Miner %d get block %d", float64(o.timestamp)/timePrecision, e.receiverID, e.block.index)
+		log.Debugf("Time %0.2f, Miner %d get block %d", float64(o.timestamp)/timePrecision, e.receiverID, e.block.index)
 	}
 	return []Event{receiveEvent}
 }
