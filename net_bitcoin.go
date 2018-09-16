@@ -92,22 +92,18 @@ func (bn *BitcoinNetwork) Setup(o *Oracle) {
 	bn.inFlight = inFlight
 	bn.nextTime = nextTime
 	bn.geo = geo
-
-	if len(bn.attacker.List()) > 1 {
-		log.Fatal("Too much attackers")
-	}
 }
 
 func (bn *BitcoinNetwork) Broadcast(senderID int, block *Block) []Event {
 	bn.sent[senderID].Add(block.index)
 	bn.inFlight[senderID].Add(block.index)
 
-	var attackerRelay []Event
+	attackerRelay := []Event{}
 	if bn.attacker.Has(block.minerID) {
-		attackerRelay = bn.expressBroadcast(block)
-	} else {
-		attackerRelay = bn.expressRelay(block)
+		attackerRelay = append(attackerRelay, bn.expressBroadcast(block)...)
 	}
+	attackerRelay = append(attackerRelay, bn.expressRelay(block)...)
+
 	if _, ok := block.receivingTime[senderID]; !ok {
 		block.receivingTime[senderID] = bn.oracle.timestamp
 	}

@@ -76,13 +76,10 @@ func run() *Oracle {
 		//attacker := NewWithholdMiner(delayRef)
 		oracle.addMiner(attacker, attacker_/(1-attacker_))
 	}
-
-	//ratio := 0.8
-	//_ = (1 - math.Pow(ratio, float64(honestMiners))) / (1 - ratio)
 	for i := 0; i < honestMiners; i++ {
 		oracle.addHonestMiner(1.0 / honestMiners)
-		//oracle.addHonestMiner(math.Pow(ratio, float64(i)) / sum)
 	}
+	oracle.finalizeMiners()
 
 	oracle.setNetwork(network)
 

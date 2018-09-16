@@ -45,6 +45,7 @@ func (ms *MinerSet) normalize() {
 	for id, weight := range ms.weights {
 		ratio = ratio + weight/totalWeight
 		ms.cumTable[id] = ratio
+		ms.weights[id] /= totalWeight
 	}
 }
 
@@ -83,8 +84,6 @@ func NewOracle(timePrecision float64, rate float64, duration float64) *Oracle {
 }
 
 func (o *Oracle) prepare() {
-	o.miners.normalize()
-
 	newBlockEvent := o.mineNextBlock()
 	o.queue.Push(newBlockEvent)
 
@@ -138,6 +137,10 @@ func (o *Oracle) addMiner(miner Miner, weight float64) int {
 func (o *Oracle) addHonestMiner(weight float64) int {
 	miner := NewHonestMiner()
 	return o.addMiner(miner, weight)
+}
+
+func (o *Oracle) finalizeMiners() {
+	o.miners.normalize()
 }
 
 func (o *Oracle) setNetwork(network Network) {
